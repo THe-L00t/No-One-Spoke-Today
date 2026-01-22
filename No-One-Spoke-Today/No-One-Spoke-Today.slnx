@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="No-One-Spoke-Today/No-One-Spoke-Today.vcxproj" />
+</Solution>
