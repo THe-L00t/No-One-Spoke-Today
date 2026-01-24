@@ -14,6 +14,8 @@
 #include <sstream>
 #include <algorithm>
 #include <cassert>
+#include <print>
+#include <conio.h>
 
 #ifdef _WIN32
 #include <windows.h>
