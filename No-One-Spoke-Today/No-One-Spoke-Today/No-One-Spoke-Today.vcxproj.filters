@@ -30,9 +30,6 @@
     <ClCompile Include="Framework.cpp">
       <Filter>소스 파일\Framework</Filter>
     </ClCompile>
-    <ClCompile Include="Time.cpp">
-      <Filter>소스 파일\Time</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
