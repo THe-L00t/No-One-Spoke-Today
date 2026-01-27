@@ -28,8 +28,14 @@ void Framework::Loop()
     currentScene->Enter();
     while (true) {
         if (_kbhit()) {
-            currentScene->HandleInput();
-            std::cout << "입력처리 완료" << std::endl;
+            int input = _getch();
+            if (input == 0 || input == 224) { // 방향키 또는 기능키
+                int dir = _getch();
+                currentScene->sHandleInput(dir);
+            }
+            else {
+                currentScene->HandleInput(input);
+            }
         }
         currentScene->Update(timer->deltaTime);
         //currentScene->Display();

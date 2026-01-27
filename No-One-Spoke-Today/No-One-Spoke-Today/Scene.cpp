@@ -38,24 +38,30 @@ void TitleScene::Exit()
 {
 	sceneChangeRequested = false;
 	system("cls");
-	typewriter_print(intro);
+	if(option == 0) typewriter_print(intro);
 }
 
-void TitleScene::HandleInput()
+void TitleScene::HandleInput(char input)
 {
-	char input = _getch();
-	if (input == 0 || input == 224) { // 방향키 또는 기능키
-		char dir = _getch();
-		switch (dir) {
-		case 72: if(option not_eq 0) option -= 1; break;		// 위
-		case 80: if(option not_eq 2) option += 1; break;		// 아래
-		case 75: std::cout << "왼쪽\n"; break;		//왼
-		case 77: std::cout << "오른쪽\n"; break;		//오
-		}
-		std::cout << "입력됨" << std::endl;
+	switch (input) {
+	case '\r':
+		if (option == 0) RequestSceneChange("play");
+		else if (option == 1) RequestSceneChange("play");
+		else if (option == 2) exit(0);
 	}
-	//Display();
-	//RequestSceneChange("play");
+	Display();
+
+}
+
+void TitleScene::sHandleInput(char input)
+{
+	switch (input) {
+	case 72: if (option not_eq 0) option -= 1; break;		// 위
+	case 80: if (option not_eq 2) option += 1; break;		// 아래
+		//case 75: std::cout << "왼쪽\n"; break;		//왼
+		//case 77: std::cout << "오른쪽\n"; break;		//오
+	}
+	Display();
 }
 
 void GameScene::Enter()
@@ -80,7 +86,11 @@ void GameScene::Exit()
 	sceneChangeRequested = false;
 }
 
-void GameScene::HandleInput()
+void GameScene::HandleInput(char input)
+{
+}
+
+void GameScene::sHandleInput(char input)
 {
 }
 
@@ -101,6 +111,10 @@ void MenuScene::Exit()
 	bool sceneChangeRequested = false;
 }
 
-void MenuScene::HandleInput()
+void MenuScene::HandleInput(char input)
+{
+}
+
+void MenuScene::sHandleInput(char)
 {
 }

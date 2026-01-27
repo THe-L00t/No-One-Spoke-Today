@@ -11,7 +11,8 @@ public:
 	virtual void Update(float) = 0;
 	virtual void Display() = 0;
 	virtual void Exit() = 0;
-	virtual void HandleInput() = 0;
+	virtual void HandleInput(char) = 0;
+	virtual void sHandleInput(char) = 0;
 
 	bool IsSceneChangeRequested() const { return sceneChangeRequested; }
 	std::string GetNextSceneName() const { return nextSceneName; }
@@ -35,7 +36,8 @@ public:
 	void Update(float);
 	void Display();
 	void Exit();
-	void HandleInput();
+	void HandleInput(char);
+	void sHandleInput(char);
 
 private:
 	std::string title;
@@ -51,7 +53,8 @@ public:
 	void Update(float);
 	void Display();
 	void Exit();
-	void HandleInput();
+	void HandleInput(char);
+	void sHandleInput(char);
 
 private:
 	World* world{ nullptr };
@@ -65,7 +68,8 @@ public:
 	void Update(float);
 	void Display();
 	void Exit();
-	void HandleInput();
+	void HandleInput(char);
+	void sHandleInput(char);
 
 private:
 
