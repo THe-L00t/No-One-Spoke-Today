@@ -17,7 +17,11 @@ World::World()
 void World::Update(float deltaTime)
 {
 	CityMetrics cm{city->GetCityMet()};
-
+	for (auto& h : humans) {
+		h->UpdateDrive(deltaTime, cm);
+		h->UpdateMentalState();
+	}
+	city->Update(humans);
 }
 
 void World::Debug()
