@@ -29,10 +29,10 @@ void Framework::Loop()
     while (true) {
         if (_kbhit()) {
             char input = _getch();
-
+            currentScene->HandleInput(input);
         }
         currentScene->Update();
-        currentScene->Display();
+        //currentScene->Display();
 
         // 씬 전환 체크
         if (currentScene->IsSceneChangeRequested()) {

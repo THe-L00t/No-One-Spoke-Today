@@ -37,6 +37,7 @@ public:
 	void HandleInput(char);
 
 private:
+	std::string title;
 	std::string introText;
 };
 

@@ -21,9 +21,9 @@ void typewriter_print(const std::string& text, int delay_ms) {
     std::cout << std::endl;
 }
 
-void loadIntro(std::string& intro)
+void LoadText(std::string& intro, const std::string& path)
 {
-    std::ifstream in{ "intro.txt" };
+    std::ifstream in{ path };
     if (not in) return ;
 
     std::ostringstream ss;

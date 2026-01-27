@@ -6,6 +6,12 @@ int main() {
 	game.Init();
 	game.Loop();
 	game.Destroy();*/
-	typewriter_print("안녕하세요. 여기는 콘솔 텍스트 게임입니다.");
+	std::ifstream in{ "title.txt" };
+	if (not in) return 0;
+	std::string title;
+	std::ostringstream ss;
+	ss << in.rdbuf();   // 핵심 한 줄
+	title = ss.str();
+	typewriter_print(title);
 
 }

@@ -3,7 +3,9 @@
 
 void TitleScene::Enter()
 {
-	LoadIntro(introText);
+	LoadText(title, "title.txt");
+	LoadText(introText, "intro.txt");
+	typewriter_print(title);
 }
 
 void TitleScene::Update()
@@ -23,6 +25,7 @@ void TitleScene::Exit()
 
 void TitleScene::HandleInput(char)
 {
+
 }
 
 void GameScene::Enter()

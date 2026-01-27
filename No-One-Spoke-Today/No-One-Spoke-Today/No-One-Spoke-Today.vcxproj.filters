@@ -25,6 +25,15 @@
     <Filter Include="소스 파일\Toolkit">
       <UniqueIdentifier>{8fc998fd-206e-4565-8731-5135124fc0f9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\City">
+      <UniqueIdentifier>{7fbba4b3-effa-4059-8806-397341fdf032}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Human">
+      <UniqueIdentifier>{90c994c3-3cbb-4aa6-8492-084b5b3929c4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\World">
+      <UniqueIdentifier>{f6a518ac-d48f-4251-becd-f1ac4a7f4058}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -41,6 +50,15 @@
     </ClCompile>
     <ClCompile Include="Toolkit.cpp">
       <Filter>소스 파일\Toolkit</Filter>
+    </ClCompile>
+    <ClCompile Include="City.cpp">
+      <Filter>소스 파일\City</Filter>
+    </ClCompile>
+    <ClCompile Include="Human.cpp">
+      <Filter>소스 파일\Human</Filter>
+    </ClCompile>
+    <ClCompile Include="World.cpp">
+      <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -59,9 +77,21 @@
     <ClInclude Include="Toolkit.h">
       <Filter>소스 파일\Toolkit</Filter>
     </ClInclude>
+    <ClInclude Include="City.h">
+      <Filter>소스 파일\City</Filter>
+    </ClInclude>
+    <ClInclude Include="Human.h">
+      <Filter>소스 파일\Human</Filter>
+    </ClInclude>
+    <ClInclude Include="World.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="intro.txt">
+      <Filter>리소스 파일</Filter>
+    </Text>
+    <Text Include="title.txt">
       <Filter>리소스 파일</Filter>
     </Text>
   </ItemGroup>
