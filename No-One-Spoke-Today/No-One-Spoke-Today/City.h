@@ -1,8 +1,6 @@
 #pragma once
 #include "pch.h"
 
-class Human;
-
 struct CityMetrics {		// 0~10000
 	int mood;
 	int activity;

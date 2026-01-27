@@ -10,7 +10,7 @@ World::World()
 	{
 		humans.emplace_back(std::make_unique<Human>());
 	}
-	city = std::make_unique<City>();
+	city = std::make_unique<City>(humans);
 }
 
 void World::Debug()

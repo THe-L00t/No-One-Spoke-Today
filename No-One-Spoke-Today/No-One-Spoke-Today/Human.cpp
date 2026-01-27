@@ -172,3 +172,23 @@ int Human::GetMotivation() const
     return drives.motivation;
 }
 
+ArousalState Human::GetArousal() const
+{
+    return state.arousal;
+}
+
+SocialState Human::GetSocial() const
+{
+    return state.social;
+}
+
+EnergyState Human::GetEnergy() const
+{
+    return state.energy;
+}
+
+ControlState Human::GetControl() const
+{
+    return state.control;
+}
+
