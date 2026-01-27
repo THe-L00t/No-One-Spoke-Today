@@ -1,15 +1,16 @@
 #include "World.h"
 
 #define humansNum 200
+#define tempNum 50
 
 World::World()
 {
-	city = std::make_unique<City>();
-	humans.reserve(humansNum);
+	humans.reserve(humansNum + tempNum);
 	for (size_t i = 0; i < humansNum; ++i)
 	{
 		humans.emplace_back(std::make_unique<Human>());
 	}
+	city = std::make_unique<City>();
 }
 
 void World::Debug()

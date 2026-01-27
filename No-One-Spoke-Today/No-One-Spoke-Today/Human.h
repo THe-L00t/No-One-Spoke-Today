@@ -12,12 +12,12 @@ struct Trait {
 
 struct Drives {
 	int stressLoad;			// 스트레스 누적
-	int EmotionalArousal;	// 감정 각성
+	int emotionalArousal;	// 감정 각성
 	int fatigue;			// 피로
 	int cognitiveCapacity;	// 인지 능력
 	int interpersonalTrust;	// 대인 신뢰
 	int socialSafety;		// 사회적 안전감
-	int SenseOfControl;		// 통제감
+	int senseOfControl;		// 통제감
 	int motivation;			// 동기 
 };
 
@@ -56,11 +56,30 @@ class Human
 public:
 	Human();
 
+	void UpdateMentalState();
 
-	void updateMentalState();
+	int GetRationality() const;
+	int GetAggressiveness() const;
+	int GetPlanning() const;
+	int GetDependency() const;
+	int GetRigidity() const;
+	int GetEmotionalSensitivity() const;
+	int GetStressLoad() const;
+	int GetEmotionalArousal() const;
+	int GetFatigue() const;
+	int GetCognitiveCapacity() const;
+	int GetInterpersonalTrust() const;
+	int GetSocialSafety() const;
+	int GetSenseOfControl() const;
+	int GetMotivation() const;
+
 private:
 	Trait traits;
 	Drives drives;
 	MentalState state;
+
+	std::string name;
+	bool male;
+	
 };
 
