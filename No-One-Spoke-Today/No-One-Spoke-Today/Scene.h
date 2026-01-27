@@ -11,7 +11,7 @@ public:
 	virtual void Update(float) = 0;
 	virtual void Display() = 0;
 	virtual void Exit() = 0;
-	virtual void HandleInput(char) = 0;
+	virtual void HandleInput() = 0;
 
 	bool IsSceneChangeRequested() const { return sceneChangeRequested; }
 	std::string GetNextSceneName() const { return nextSceneName; }
@@ -35,11 +35,12 @@ public:
 	void Update(float);
 	void Display();
 	void Exit();
-	void HandleInput(char);
+	void HandleInput();
 
 private:
 	std::string title;
 	std::string intro;
+	int option{};
 };
 
 class GameScene : public Scene
@@ -50,10 +51,10 @@ public:
 	void Update(float);
 	void Display();
 	void Exit();
-	void HandleInput(char);
+	void HandleInput();
 
 private:
-	World* world;
+	World* world{ nullptr };
 };
 
 class MenuScene : public Scene
@@ -64,7 +65,7 @@ public:
 	void Update(float);
 	void Display();
 	void Exit();
-	void HandleInput(char);
+	void HandleInput();
 
 private:
 

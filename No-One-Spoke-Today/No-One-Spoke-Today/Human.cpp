@@ -49,7 +49,7 @@ Human::Human()
 void Human::UpdateMentalState()
 {
     // ---------- ArousalState ----------
-        // »óÅÂº° ÀÓ°è°ª °è»ê (Á¤±³ÇÑ ¼ö½Ä À¯Áö)
+        // ìƒíƒœë³„ ì„ê³„ê°’ ê³„ì‚° (ì •êµí•œ ìˆ˜ì‹ ìœ ì§€)
     double tenseThreshold = 40.0 - traits.emotionalSensitivity * 0.25 + traits.rationality * 0.15;
     double irritableThreshold = 60.0 - traits.emotionalSensitivity * 0.35 + traits.aggressiveness * 0.25;
     double hostileThreshold = 75.0 - traits.emotionalSensitivity * 0.45 + traits.aggressiveness * 0.35;
@@ -68,7 +68,7 @@ void Human::UpdateMentalState()
     }
 
     // ---------- EnergyState ----------
-    // ÇÇ·Î ´©Àû + ÀÎÁö ´É·Â, °¨Á¤ °¢¼º °í·Á
+    // í”¼ë¡œ ëˆ„ì  + ì¸ì§€ ëŠ¥ë ¥, ê°ì • ê°ì„± ê³ ë ¤
     double fatigueScore = drives.fatigue + drives.emotionalArousal * 0.2 - drives.cognitiveCapacity * 0.1;
     if (fatigueScore < 50.0)
         state.energy = EnergyState::Normal;
@@ -78,7 +78,7 @@ void Human::UpdateMentalState()
         state.energy = EnergyState::Exhausted;
 
     // ---------- SocialState ----------
-    // ½Å·Ú, ÅëÁ¦°¨, °¨Á¤ °¢¼º, ÀÇÁ¸¼º ¹İ¿µ
+    // ì‹ ë¢°, í†µì œê°, ê°ì • ê°ì„±, ì˜ì¡´ì„± ë°˜ì˜
     double coopScore = drives.interpersonalTrust + drives.motivation * 0.5 - drives.senseOfControl * 0.3 + traits.dependency * 0.2;
     double withdrawScore = 100 - drives.interpersonalTrust + drives.fatigue * 0.5 + traits.rigidity * 0.3;
 
@@ -90,7 +90,7 @@ void Human::UpdateMentalState()
         state.social = SocialState::Neutral;
 
     // ---------- ControlState ----------
-    // ÅëÁ¦°¨, ÀÇÁ¸¼º, °íÁı, ½ºÆ®·¹½º °í·Á
+    // í†µì œê°, ì˜ì¡´ì„±, ê³ ì§‘, ìŠ¤íŠ¸ë ˆìŠ¤ ê³ ë ¤
     double dependentScore = traits.dependency * 0.6 + (50 - drives.senseOfControl) * 0.4;
     double stubbornScore = traits.rigidity * 0.7 + drives.stressLoad * 0.3;
 
@@ -104,15 +104,15 @@ void Human::UpdateMentalState()
 
 void Human::UpdateDrive(float deltaTime, CityMetrics city)
 {
-    // ¥ÄTimeÀ» ÃÊ ´ÜÀ§·Î ¹ŞÀ½
-    // ÃÖ´ë º¯È­·® »ó¼ö
-    const int MAX_STRESS_DELTA = 50;     // 1ÃÊ ±âÁØ ÃÖ´ë º¯È­·®
+    // Î”Timeì„ ì´ˆ ë‹¨ìœ„ë¡œ ë°›ìŒ
+    // ìµœëŒ€ ë³€í™”ëŸ‰ ìƒìˆ˜
+    const int MAX_STRESS_DELTA = 50;     // 1ì´ˆ ê¸°ì¤€ ìµœëŒ€ ë³€í™”ëŸ‰
     const int MAX_MOTIVATION_DELTA = 30;
     const int MAX_SOCIAL_DELTA = 20;
 
     // --- StressLoad ---
     int stressDelta = MAX_STRESS_DELTA * (10000 - city.mood) / 10000;
-    // »óÅÂ º¸Á¤
+    // ìƒíƒœ ë³´ì •
     switch (state.arousal) {
     case ArousalState::Calm: stressDelta *= 0.5; break;
     case ArousalState::Tense: stressDelta *= 1.0; break;

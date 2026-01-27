@@ -2,6 +2,7 @@
 #include "Toolkit.h"
 
 int main() {
+	SetConsoleOutputCP(CP_UTF8);
 	std::string ASCII_image;
 	LoadText(ASCII_image, "titleASCIIart.txt");
 	std::cout << ASCII_image << std::endl;

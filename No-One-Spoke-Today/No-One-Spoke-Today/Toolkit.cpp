@@ -27,6 +27,6 @@ void LoadText(std::string& intro, const std::string& path)
     if (not in) return ;
 
     std::ostringstream ss;
-    ss << in.rdbuf();   // ÇÙ½É ÇÑ ÁÙ
+    ss << in.rdbuf();   // í•µì‹¬ í•œ ì¤„
     intro = ss.str();
 }

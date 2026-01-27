@@ -27,7 +27,7 @@ void World::Update(float deltaTime)
 void World::Debug()
 {
 	if (city not_eq nullptr)
-		std::cout << "city ¹®Á¦ ¾øÀ½" << std::endl;
+		std::cout << "city ë¬¸ì œ ì—†ìŒ" << std::endl;
 	std::cout << humans.size() << std::endl;
 	city->Debug();
 }

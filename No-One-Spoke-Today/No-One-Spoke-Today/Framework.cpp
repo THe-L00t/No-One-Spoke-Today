@@ -28,8 +28,8 @@ void Framework::Loop()
     currentScene->Enter();
     while (true) {
         if (_kbhit()) {
-            char input = _getch();
-            currentScene->HandleInput(input);
+            currentScene->HandleInput();
+            std::cout << "입력처리 완료" << std::endl;
         }
         currentScene->Update(timer->deltaTime);
         //currentScene->Display();

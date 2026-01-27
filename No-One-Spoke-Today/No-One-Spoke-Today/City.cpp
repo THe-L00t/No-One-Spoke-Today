@@ -9,11 +9,11 @@ City::City(const std::vector<std::unique_ptr<Human>>& humans)
     int scarcitySum = 0;
 
     for (const auto& h : humans) {
-        // --- Mood °è»ê ---
-        // ÀÌ¼º(rationality), °ø°Ý¼º(aggressiveness), °¨Á¤ ¹Î°¨µµ(emotionalSensitivity), ½ºÆ®·¹½º, »çÈ¸ ¾ÈÀü°¨
+        // --- Mood ê³„ì‚° ---
+        // ì´ì„±(rationality), ê³µê²©ì„±(aggressiveness), ê°ì • ë¯¼ê°ë„(emotionalSensitivity), ìŠ¤íŠ¸ë ˆìŠ¤, ì‚¬íšŒ ì•ˆì „ê°
         int mood = 5000;
         
-        // °¨Á¤ °¢¼º
+        // ê°ì • ê°ì„±
         switch (h->GetArousal()) {
         case ArousalState::Calm: mood += 1000; break;
         case ArousalState::Tense: mood += 300; break;
@@ -21,17 +21,17 @@ City::City(const std::vector<std::unique_ptr<Human>>& humans)
         case ArousalState::Hostile: mood -= 1000; break;
         }
 
-        // »çÈ¸Àû ÅÂµµ
+        // ì‚¬íšŒì  íƒœë„
         switch (h->GetSocial()) {
         case SocialState::Cooperative: mood += 800; break;
         case SocialState::Neutral: mood += 0; break;
         case SocialState::Withdrawn: mood -= 400; break;
         }
 
-        // ¼ºÇâ ¿µÇâ: °¨Á¤ ¹Î°¨µµ, °ø°Ý¼º, ÀÌ¼º
+        // ì„±í–¥ ì˜í–¥: ê°ì • ë¯¼ê°ë„, ê³µê²©ì„±, ì´ì„±
         mood += (h->GetEmotionalSensitivity() * 2 - h->GetRationality() - h->GetAggressiveness());
 
-        // Drives ¿µÇâ: ½ºÆ®·¹½º, ÇÇ·Î, »çÈ¸ ¾ÈÀü°¨
+        // Drives ì˜í–¥: ìŠ¤íŠ¸ë ˆìŠ¤, í”¼ë¡œ, ì‚¬íšŒ ì•ˆì „ê°
         mood -= h->GetStressLoad();
         mood -= h->GetFatigue() / 2;
         mood += h->GetSocialSafety();
@@ -39,31 +39,31 @@ City::City(const std::vector<std::unique_ptr<Human>>& humans)
         mood = std::clamp(mood, 0, 10000);
         moodSum += mood;
 
-        // --- Activity °è»ê ---
+        // --- Activity ê³„ì‚° ---
         int activity = 5000;
 
-        // ¿¡³ÊÁö »óÅÂ
+        // ì—ë„ˆì§€ ìƒíƒœ
         switch (h->GetEnergy()) {
         case EnergyState::Normal: activity += 1000; break;
         case EnergyState::Fatigued: activity -= 500; break;
         case EnergyState::Exhausted: activity -= 1000; break;
         }
 
-        // ¼ºÇâ ¿µÇâ: °èÈ¹(planning), ÀÇÁ¸(dependency)
-        activity += h->GetPlanning() * 5;      // Àå±â °èÈ¹ ¼ºÇâÀÌ ³ôÀ¸¸é »ý»ê¼º Áõ°¡
-        activity -= h->GetDependency() * 3;   // ÀÇÁ¸ ¼ºÇâ ³ôÀ¸¸é ÀÚÀ² Çàµ¿ °¨¼Ò
+        // ì„±í–¥ ì˜í–¥: ê³„íš(planning), ì˜ì¡´(dependency)
+        activity += h->GetPlanning() * 5;      // ìž¥ê¸° ê³„íš ì„±í–¥ì´ ë†’ìœ¼ë©´ ìƒì‚°ì„± ì¦ê°€
+        activity -= h->GetDependency() * 3;   // ì˜ì¡´ ì„±í–¥ ë†’ìœ¼ë©´ ìžìœ¨ í–‰ë™ ê°ì†Œ
 
-        // Drives ¿µÇâ: µ¿±â, ÀÎÁö ´É·Â
+        // Drives ì˜í–¥: ë™ê¸°, ì¸ì§€ ëŠ¥ë ¥
         activity += h->GetMotivation() * 10;
         activity += h->GetCognitiveCapacity() / 2;
 
         activity = std::clamp(activity, 0, 10000);
         activitySum += activity;
 
-        // --- Scarcity °è»ê ---
+        // --- Scarcity ê³„ì‚° ---
         int scarcity = 5000;
 
-        // ½ºÆ®·¹½º, ÇÇ·Î, ÅëÁ¦°¨, ÀÇÁ¸, °íÁý, »çÈ¸ ¾ÈÀü°¨
+        // ìŠ¤íŠ¸ë ˆìŠ¤, í”¼ë¡œ, í†µì œê°, ì˜ì¡´, ê³ ì§‘, ì‚¬íšŒ ì•ˆì „ê°
         scarcity += h->GetStressLoad() / 2;
         scarcity += h->GetFatigue() / 2;
         scarcity -= h->GetSocialSafety() / 2;
@@ -75,7 +75,7 @@ City::City(const std::vector<std::unique_ptr<Human>>& humans)
         case ControlState::Autonomous: scarcity += 0; break;
         }
 
-        // ¼ºÇâ ¿µÇâ
+        // ì„±í–¥ ì˜í–¥
         scarcity += h->GetDependency() * 5;
         scarcity += h->GetRigidity() * 3;
 
@@ -102,11 +102,11 @@ void City::Update(const std::vector<std::unique_ptr<Human>>& humans)
     int scarcitySum = 0;
 
     for (const auto& h : humans) {
-        // --- Mood °è»ê ---
-        // ÀÌ¼º(rationality), °ø°Ý¼º(aggressiveness), °¨Á¤ ¹Î°¨µµ(emotionalSensitivity), ½ºÆ®·¹½º, »çÈ¸ ¾ÈÀü°¨
+        // --- Mood ê³„ì‚° ---
+        // ì´ì„±(rationality), ê³µê²©ì„±(aggressiveness), ê°ì • ë¯¼ê°ë„(emotionalSensitivity), ìŠ¤íŠ¸ë ˆìŠ¤, ì‚¬íšŒ ì•ˆì „ê°
         int mood = 5000;
 
-        // °¨Á¤ °¢¼º
+        // ê°ì • ê°ì„±
         switch (h->GetArousal()) {
         case ArousalState::Calm: mood += 1000; break;
         case ArousalState::Tense: mood += 300; break;
@@ -114,17 +114,17 @@ void City::Update(const std::vector<std::unique_ptr<Human>>& humans)
         case ArousalState::Hostile: mood -= 1000; break;
         }
 
-        // »çÈ¸Àû ÅÂµµ
+        // ì‚¬íšŒì  íƒœë„
         switch (h->GetSocial()) {
         case SocialState::Cooperative: mood += 800; break;
         case SocialState::Neutral: mood += 0; break;
         case SocialState::Withdrawn: mood -= 400; break;
         }
 
-        // ¼ºÇâ ¿µÇâ: °¨Á¤ ¹Î°¨µµ, °ø°Ý¼º, ÀÌ¼º
+        // ì„±í–¥ ì˜í–¥: ê°ì • ë¯¼ê°ë„, ê³µê²©ì„±, ì´ì„±
         mood += (h->GetEmotionalSensitivity() * 2 - h->GetRationality() - h->GetAggressiveness());
 
-        // Drives ¿µÇâ: ½ºÆ®·¹½º, ÇÇ·Î, »çÈ¸ ¾ÈÀü°¨
+        // Drives ì˜í–¥: ìŠ¤íŠ¸ë ˆìŠ¤, í”¼ë¡œ, ì‚¬íšŒ ì•ˆì „ê°
         mood -= h->GetStressLoad();
         mood -= h->GetFatigue() / 2;
         mood += h->GetSocialSafety();
@@ -132,31 +132,31 @@ void City::Update(const std::vector<std::unique_ptr<Human>>& humans)
         mood = std::clamp(mood, 0, 10000);
         moodSum += mood;
 
-        // --- Activity °è»ê ---
+        // --- Activity ê³„ì‚° ---
         int activity = 5000;
 
-        // ¿¡³ÊÁö »óÅÂ
+        // ì—ë„ˆì§€ ìƒíƒœ
         switch (h->GetEnergy()) {
         case EnergyState::Normal: activity += 1000; break;
         case EnergyState::Fatigued: activity -= 500; break;
         case EnergyState::Exhausted: activity -= 1000; break;
         }
 
-        // ¼ºÇâ ¿µÇâ: °èÈ¹(planning), ÀÇÁ¸(dependency)
-        activity += h->GetPlanning() * 5;      // Àå±â °èÈ¹ ¼ºÇâÀÌ ³ôÀ¸¸é »ý»ê¼º Áõ°¡
-        activity -= h->GetDependency() * 3;   // ÀÇÁ¸ ¼ºÇâ ³ôÀ¸¸é ÀÚÀ² Çàµ¿ °¨¼Ò
+        // ì„±í–¥ ì˜í–¥: ê³„íš(planning), ì˜ì¡´(dependency)
+        activity += h->GetPlanning() * 5;      // ìž¥ê¸° ê³„íš ì„±í–¥ì´ ë†’ìœ¼ë©´ ìƒì‚°ì„± ì¦ê°€
+        activity -= h->GetDependency() * 3;   // ì˜ì¡´ ì„±í–¥ ë†’ìœ¼ë©´ ìžìœ¨ í–‰ë™ ê°ì†Œ
 
-        // Drives ¿µÇâ: µ¿±â, ÀÎÁö ´É·Â
+        // Drives ì˜í–¥: ë™ê¸°, ì¸ì§€ ëŠ¥ë ¥
         activity += h->GetMotivation() * 10;
         activity += h->GetCognitiveCapacity() / 2;
 
         activity = std::clamp(activity, 0, 10000);
         activitySum += activity;
 
-        // --- Scarcity °è»ê ---
+        // --- Scarcity ê³„ì‚° ---
         int scarcity = 5000;
 
-        // ½ºÆ®·¹½º, ÇÇ·Î, ÅëÁ¦°¨, ÀÇÁ¸, °íÁý, »çÈ¸ ¾ÈÀü°¨
+        // ìŠ¤íŠ¸ë ˆìŠ¤, í”¼ë¡œ, í†µì œê°, ì˜ì¡´, ê³ ì§‘, ì‚¬íšŒ ì•ˆì „ê°
         scarcity += h->GetStressLoad() / 2;
         scarcity += h->GetFatigue() / 2;
         scarcity -= h->GetSocialSafety() / 2;
@@ -168,7 +168,7 @@ void City::Update(const std::vector<std::unique_ptr<Human>>& humans)
         case ControlState::Autonomous: scarcity += 0; break;
         }
 
-        // ¼ºÇâ ¿µÇâ
+        // ì„±í–¥ ì˜í–¥
         scarcity += h->GetDependency() * 5;
         scarcity += h->GetRigidity() * 3;
 
