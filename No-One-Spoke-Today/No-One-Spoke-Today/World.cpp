@@ -12,6 +12,7 @@ World::World()
 		humans.emplace_back(std::make_unique<Human>());
 	}
 	city = std::make_unique<City>(humans);
+	eventManager = std::make_unique<EventManager>();
 }
 
 void World::Update(float deltaTime)
@@ -22,6 +23,19 @@ void World::Update(float deltaTime)
 		h->UpdateMentalState();
 	}
 	city->Update(humans);
+
+	// 이벤트 처리 (도시/인간 업데이트 이후)
+	eventManager->ProcessDailyEvents(*city, city->GetCityMet(), humans, currentDay);
+}
+
+EventManager* World::GetEventManager()
+{
+	return eventManager.get();
+}
+
+City* World::GetCity()
+{
+	return city.get();
 }
 
 void World::Debug()
