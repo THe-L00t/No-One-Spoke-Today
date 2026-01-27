@@ -1,7 +1,7 @@
 #pragma once
 #include "pch.h"
 
-struct State {
+struct personality {
 	int rationality;		// 이성 : 판단을 이성적으로 하려는 경향
 	int impulsiveness;	// 충동 : 즉각 반응하는 성향	
 	int aggressiveness;	// 폭력 : 공격적 해결 성향
@@ -17,6 +17,6 @@ public:
 	Human();
 
 private:
-	State state;
+	personality personal;
 };
 

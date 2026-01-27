@@ -8,6 +8,13 @@ World::World()
 	humans.reserve(humansNum);
 	for (size_t i = 0; i < humansNum; ++i)
 	{
-		humans[i] = std::make_unique<Human>();
+		humans.emplace_back(std::make_unique<Human>());
 	}
+}
+
+void World::Debug()
+{
+	if (city not_eq nullptr)
+		std::cout << "city 문제 없음" << std::endl;
+	std::cout << humans.size() << std::endl;
 }

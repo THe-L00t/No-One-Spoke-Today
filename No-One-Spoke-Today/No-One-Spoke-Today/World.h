@@ -9,6 +9,7 @@ class World
 public:
 	World();
 
+	void Debug();
 private:
 	std::unique_ptr<City> city;
 	std::vector<std::unique_ptr<Human>> humans;

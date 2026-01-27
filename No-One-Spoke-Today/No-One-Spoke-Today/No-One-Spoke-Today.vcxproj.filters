@@ -58,7 +58,7 @@
       <Filter>소스 파일\Human</Filter>
     </ClCompile>
     <ClCompile Include="World.cpp">
-      <Filter>소스 파일</Filter>
+      <Filter>소스 파일\World</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -84,7 +84,7 @@
       <Filter>소스 파일\Human</Filter>
     </ClInclude>
     <ClInclude Include="World.h">
-      <Filter>헤더 파일</Filter>
+      <Filter>소스 파일\World</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -92,6 +92,9 @@
       <Filter>리소스 파일</Filter>
     </Text>
     <Text Include="title.txt">
+      <Filter>리소스 파일</Filter>
+    </Text>
+    <Text Include="titleASCIIart.txt">
       <Filter>리소스 파일</Filter>
     </Text>
   </ItemGroup>

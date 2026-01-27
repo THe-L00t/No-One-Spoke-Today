@@ -1,5 +1,6 @@
 #pragma once
 #include "pch.h"
+#include "World.h"
 class Scene
 {
 public:
@@ -20,9 +21,9 @@ protected:
 		sceneChangeRequested = true;
 		nextSceneName = sceneName;
 	}
+	bool sceneChangeRequested = false;
 
 private:
-	bool sceneChangeRequested = false;
 	std::string nextSceneName;
 };
 
@@ -52,7 +53,7 @@ public:
 	void HandleInput(char);
 
 private:
-
+	World* world;
 };
 
 class MenuScene : public Scene

@@ -2,8 +2,8 @@
 class City
 {
 public:
-	City();
-	~City();
+	/*City();
+	~City();*/
 
 private:
 

@@ -14,9 +14,9 @@ Framework::~Framework()
 
 void Framework::Init()
 {
-    scenes["start"] = new TitleScene();
-    scenes["play"] = new GameScene();
-    scenes["menu"] = new MenuScene();
+    scenes["start"] = std::make_unique<TitleScene>();
+    scenes["play"] = std::make_unique<GameScene>();
+    scenes["menu"] = std::make_unique<MenuScene>();
 
 }
 
@@ -24,7 +24,7 @@ void Framework::Loop()
 {
     startTime = timer.get()->timer;
 
-    currentScene = scenes["start"];
+    currentScene = scenes["start"].get();
     currentScene->Enter();
     while (true) {
         if (_kbhit()) {
@@ -38,7 +38,7 @@ void Framework::Loop()
         if (currentScene->IsSceneChangeRequested()) {
             std::string nextSceneName = currentScene->GetNextSceneName();
             currentScene->Exit();
-            currentScene = scenes[nextSceneName];
+            currentScene = scenes[nextSceneName].get();
             currentScene->Enter();
         }
     }

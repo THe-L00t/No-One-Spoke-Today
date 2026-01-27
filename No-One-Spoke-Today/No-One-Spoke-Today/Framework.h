@@ -2,6 +2,7 @@
 #include "pch.h"
 #include "Time.h"
 #include "Scene.h"
+#include "World.h"
 
 class Framework
 {
@@ -17,7 +18,9 @@ private:
 	std::unique_ptr<Time> timer;
 	float startTime;
 
-	std::unordered_map<std::string, Scene*> scenes;
+	std::unordered_map<std::string, std::unique_ptr<Scene>> scenes;
 	Scene* currentScene;
+
+	std::unique_ptr<World> world;
 };
 
