@@ -16,6 +16,7 @@
 #include <cassert>
 #include <print>
 #include <conio.h>
+#include <deque>
 
 #ifdef _WIN32
 #include <windows.h>
