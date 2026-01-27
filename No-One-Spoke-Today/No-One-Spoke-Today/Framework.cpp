@@ -31,7 +31,7 @@ void Framework::Loop()
             char input = _getch();
             currentScene->HandleInput(input);
         }
-        currentScene->Update();
+        currentScene->Update(timer->deltaTime);
         //currentScene->Display();
 
         // 씬 전환 체크

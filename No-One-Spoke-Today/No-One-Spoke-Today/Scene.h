@@ -39,7 +39,7 @@ public:
 
 private:
 	std::string title;
-	std::string introText;
+	std::string intro;
 };
 
 class GameScene : public Scene

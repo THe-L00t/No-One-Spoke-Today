@@ -2,10 +2,12 @@
 #include "Toolkit.h"
 
 int main() {
-	/*Framework game;
+	std::string ASCII_image;
+	LoadText(ASCII_image, "titleASCIIart.txt");
+	std::cout << ASCII_image << std::endl;
+	Framework game;
 	game.Init();
 	game.Loop();
-	game.Destroy();*/
-	World world;
-	world.Debug();
+	game.Destroy();
+
 }

@@ -4,8 +4,9 @@
 void TitleScene::Enter()
 {
 	LoadText(title, "title.txt");
-	LoadText(introText, "intro.txt");
-	typewriter_print(title);
+	LoadText(intro, "intro.txt");
+	system("cls");
+	typewriter_print(title, 20);
 }
 
 void TitleScene::Update(float deltaTime)
@@ -21,11 +22,13 @@ void TitleScene::Display()
 void TitleScene::Exit()
 {
 	sceneChangeRequested = false;
+	system("cls");
+	typewriter_print(intro);
 }
 
-void TitleScene::HandleInput(char)
+void TitleScene::HandleInput(char input)
 {
-
+	RequestSceneChange("play");
 }
 
 void GameScene::Enter()

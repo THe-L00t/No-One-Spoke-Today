@@ -1,8 +1,8 @@
 #pragma once
 #include "pch.h"
-
+#include "data.h"
 class Human;
-struct CityMetrics;
+
 
 class City
 {

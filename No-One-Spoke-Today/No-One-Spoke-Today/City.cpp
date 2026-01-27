@@ -1,6 +1,6 @@
 #include "City.h"
 #include "Human.h"
-#include "data.h"
+
 
 City::City(const std::vector<std::unique_ptr<Human>>& humans)
 {
@@ -190,7 +190,7 @@ void City::Debug() const
     std::cout << "scarcity : " << cityMet.scarcity << std::endl;
 }
 
-CityMetrics City::GetCityMet() const
+const CityMetrics& City::GetCityMet() const
 {
     return cityMet;
 }

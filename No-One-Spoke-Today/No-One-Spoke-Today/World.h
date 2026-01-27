@@ -14,5 +14,6 @@ public:
 private:
 	std::unique_ptr<City> city;
 	std::vector<std::unique_ptr<Human>> humans;
+	int currentDay{};
 };
 
