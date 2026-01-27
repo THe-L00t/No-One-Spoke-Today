@@ -21,6 +21,10 @@ void TitleScene::Exit()
 
 }
 
+void TitleScene::HandleInput(char)
+{
+}
+
 void GameScene::Enter()
 {
 
@@ -41,6 +45,10 @@ void GameScene::Exit()
 
 }
 
+void GameScene::HandleInput(char)
+{
+}
+
 void MenuScene::Enter()
 {
 }
@@ -54,5 +62,9 @@ void MenuScene::Display()
 }
 
 void MenuScene::Exit()
+{
+}
+
+void MenuScene::HandleInput(char)
 {
 }

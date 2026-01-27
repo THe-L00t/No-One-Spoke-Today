@@ -143,6 +143,9 @@
     <ClInclude Include="Time.h" />
     <ClInclude Include="Toolkit.h" />
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="intro.txt" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

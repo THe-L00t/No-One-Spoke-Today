@@ -10,6 +10,7 @@ public:
 	virtual void Update() = 0;
 	virtual void Display() = 0;
 	virtual void Exit() = 0;
+	virtual void HandleInput(char) = 0;
 
 	bool IsSceneChangeRequested() const { return sceneChangeRequested; }
 	std::string GetNextSceneName() const { return nextSceneName; }
@@ -33,6 +34,7 @@ public:
 	void Update();
 	void Display();
 	void Exit();
+	void HandleInput(char);
 
 private:
 	std::string introText;
@@ -46,6 +48,7 @@ public:
 	void Update();
 	void Display();
 	void Exit();
+	void HandleInput(char);
 
 private:
 
@@ -59,6 +62,7 @@ public:
 	void Update();
 	void Display();
 	void Exit();
+	void HandleInput(char);
 
 private:
 
