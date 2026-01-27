@@ -22,6 +22,9 @@
     <Filter Include="소스 파일\Scene">
       <UniqueIdentifier>{39385cf7-3712-4d92-830a-8077124d1094}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\Toolkit">
+      <UniqueIdentifier>{8fc998fd-206e-4565-8731-5135124fc0f9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -36,6 +39,9 @@
     <ClCompile Include="Scene.cpp">
       <Filter>소스 파일\Scene</Filter>
     </ClCompile>
+    <ClCompile Include="Toolkit.cpp">
+      <Filter>소스 파일\Toolkit</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
@@ -49,6 +55,9 @@
     </ClInclude>
     <ClInclude Include="Scene.h">
       <Filter>소스 파일\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Toolkit.h">
+      <Filter>소스 파일\Toolkit</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

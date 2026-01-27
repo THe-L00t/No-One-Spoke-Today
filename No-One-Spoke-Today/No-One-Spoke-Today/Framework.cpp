@@ -1,5 +1,7 @@
 #include "Framework.h"
 
+Time* Time::Instance = nullptr;
+
 Framework::Framework()
 {
 	timer = std::make_unique<Time>();
@@ -7,15 +9,23 @@ Framework::Framework()
 
 Framework::~Framework()
 {
-	std::cout << " °ÔÀÓÀ» Á¾·áÇÕ´Ï´Ù... " << std::endl;
+	std::cout << " ê²Œìž„ì„ ì¢…ë£Œí•©ë‹ˆë‹¤... " << std::endl;
 }
 
 void Framework::Init()
 {
+    scenes["start"] = new TitleScene();
+    scenes["play"] = new GameScene();
+    scenes["menu"] = new MenuScene();
+
 }
 
 void Framework::Loop()
 {
+    startTime = timer.get()->timer;
+
+    currentScene = scenes["start"];
+    currentScene->Enter();
     while (true) {
         if (_kbhit()) {
             char input = _getch();
@@ -27,4 +37,5 @@ void Framework::Loop()
 
 void Framework::Destroy()
 {
+    scenes.clear();
 }
