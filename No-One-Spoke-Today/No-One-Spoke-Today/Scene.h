@@ -8,7 +8,7 @@ public:
 	virtual ~Scene() = default;
 
 	virtual void Enter() = 0;
-	virtual void Update() = 0;
+	virtual void Update(float) = 0;
 	virtual void Display() = 0;
 	virtual void Exit() = 0;
 	virtual void HandleInput(char) = 0;
@@ -32,7 +32,7 @@ class TitleScene : public Scene
 public:
 
 	void Enter();
-	void Update();
+	void Update(float);
 	void Display();
 	void Exit();
 	void HandleInput(char);
@@ -47,7 +47,7 @@ class GameScene : public Scene
 public:
 
 	void Enter();
-	void Update();
+	void Update(float);
 	void Display();
 	void Exit();
 	void HandleInput(char);
@@ -61,7 +61,7 @@ class MenuScene : public Scene
 public:
 
 	void Enter();
-	void Update();
+	void Update(float);
 	void Display();
 	void Exit();
 	void HandleInput(char);

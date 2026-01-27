@@ -10,6 +10,7 @@ public:
 	Human();
 
 	void UpdateMentalState();
+	void UpdateDrive(float, CityMetrics);
 
 	int GetRationality() const;
 	int GetAggressiveness() const;

@@ -102,6 +102,49 @@ void Human::UpdateMentalState()
         state.control = ControlState::Autonomous;
 }
 
+void Human::UpdateDrive(float deltaTime, CityMetrics city)
+{
+    // ΔTime을 초 단위로 받음
+    // 최대 변화량 상수
+    const int MAX_STRESS_DELTA = 50;     // 1초 기준 최대 변화량
+    const int MAX_MOTIVATION_DELTA = 30;
+    const int MAX_SOCIAL_DELTA = 20;
+
+    // --- StressLoad ---
+    int stressDelta = MAX_STRESS_DELTA * (10000 - city.mood) / 10000;
+    // 상태 보정
+    switch (state.arousal) {
+    case ArousalState::Calm: stressDelta *= 0.5; break;
+    case ArousalState::Tense: stressDelta *= 1.0; break;
+    case ArousalState::Irritable: stressDelta *= 1.3; break;
+    case ArousalState::Hostile: stressDelta *= 1.5; break;
+    }
+    drives.stressLoad = std::clamp(drives.stressLoad + stressDelta * deltaTime, 0.f, 10000.f);
+
+    // --- Motivation & Cognitive Capacity ---
+    int motivationDelta = MAX_MOTIVATION_DELTA * city.activity / 10000;
+    if (state.energy == EnergyState::Fatigued) motivationDelta *= 0.7;
+    if (state.energy == EnergyState::Exhausted) motivationDelta *= 0.4;
+    drives.motivation = std::clamp(drives.motivation + motivationDelta * deltaTime, 0.f, 10000.f);
+
+    int cognitiveDelta = MAX_MOTIVATION_DELTA * city.activity / 10000;
+    drives.cognitiveCapacity = std::clamp(drives.cognitiveCapacity + cognitiveDelta * deltaTime, 0.f, 10000.f);
+
+    // --- SocialSafety & SenseOfControl ---
+    int socialDelta = MAX_SOCIAL_DELTA * (10000 - city.scarcity) / 10000;
+    if (state.control == ControlState::Dependent) socialDelta *= 0.7;
+    if (state.control == ControlState::Stubborn) socialDelta *= 0.9;
+    drives.socialSafety = std::clamp(drives.socialSafety + socialDelta * deltaTime, 0.f, 10000.f);
+    drives.senseOfControl = std::clamp(drives.senseOfControl + socialDelta * deltaTime, 0.f, 10000.f);
+
+    // --- Fatigue & EmotionalArousal ---
+    int fatigueDelta = MAX_STRESS_DELTA * (10000 - city.activity) / 10000;
+    drives.fatigue = std::clamp(drives.fatigue + fatigueDelta * deltaTime, 0.f, 10000.f);
+
+    int arousalDelta = MAX_SOCIAL_DELTA * (10000 - city.mood) / 10000;
+    drives.emotionalArousal = std::clamp(drives.emotionalArousal + arousalDelta * deltaTime, 0.f, 10000.f);
+}
+
 int Human::GetRationality() const
 {
     return traits.rationality;

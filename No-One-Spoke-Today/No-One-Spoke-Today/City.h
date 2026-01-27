@@ -1,12 +1,8 @@
 #pragma once
 #include "pch.h"
-class Human;
 
-struct CityMetrics {		// 0~10000
-	int mood;
-	int activity;
-	int scarcity;
-};
+class Human;
+struct CityMetrics;
 
 class City
 {
@@ -15,7 +11,7 @@ public:
 	~City();
 
 	void Debug() const;
-
+	const CityMetrics& GetCityMet() const;
 private:
 	CityMetrics cityMet;
 

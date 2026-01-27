@@ -102,3 +102,8 @@ void City::Debug() const
     std::cout << "activity : " << cityMet.activity << std::endl;
     std::cout << "scarcity : " << cityMet.scarcity << std::endl;
 }
+
+CityMetrics City::GetCityMet() const
+{
+    return cityMet;
+}

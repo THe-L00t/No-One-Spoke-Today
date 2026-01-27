@@ -9,6 +9,7 @@ class World
 public:
 	World();
 
+	void Update(float);
 	void Debug();
 private:
 	std::unique_ptr<City> city;

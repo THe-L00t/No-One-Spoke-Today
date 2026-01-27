@@ -1,4 +1,6 @@
 #pragma once
+
+// Human ==============================================================================================
 struct Trait {
 	int rationality;			// 감정보다 이성·논리 우선
 	int aggressiveness;			// 위협 시 공격으로 대응하려는 경향	
@@ -46,4 +48,12 @@ struct MentalState {
 	SocialState social;        // 사회적 태도
 	EnergyState energy;        // 에너지/소진
 	ControlState control;      // 통제감/의존
+};
+
+
+// city =============================================================================================
+struct CityMetrics {		// 0~10000
+	int mood;
+	int activity;
+	int scarcity;
 };

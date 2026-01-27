@@ -8,7 +8,7 @@ void TitleScene::Enter()
 	typewriter_print(title);
 }
 
-void TitleScene::Update()
+void TitleScene::Update(float deltaTime)
 {
 
 }
@@ -33,7 +33,7 @@ void GameScene::Enter()
 
 }
 
-void GameScene::Update()
+void GameScene::Update(float deltaTime)
 {
 
 }
@@ -56,7 +56,7 @@ void MenuScene::Enter()
 {
 }
 
-void MenuScene::Update()
+void MenuScene::Update(float deltaTime)
 {
 }
 
