@@ -17,15 +17,16 @@ void Framework::Init()
     scenes["start"] = std::make_unique<TitleScene>();
     scenes["play"] = std::make_unique<GameScene>();
     scenes["menu"] = std::make_unique<MenuScene>();
+    scenes["save"] = std::make_unique<SaveScene>();
 
 }
 
 void Framework::Loop()
 {
     startTime = timer.get()->timer;
-
+    World w;
     currentScene = scenes["start"].get();
-    currentScene->Enter();
+    currentScene->Enter(w);
     while (true) {
         if (_kbhit()) {
             int input = _getch();
@@ -45,7 +46,7 @@ void Framework::Loop()
             std::string nextSceneName = currentScene->GetNextSceneName();
             currentScene->Exit();
             currentScene = scenes[nextSceneName].get();
-            currentScene->Enter();
+            currentScene->Enter(w);
         }
     }
 }
