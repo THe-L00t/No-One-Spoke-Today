@@ -31,7 +31,16 @@ void Framework::Loop()
             char input = _getch();
 
         }
+        currentScene->Update();
+        currentScene->Display();
 
+        // 씬 전환 체크
+        if (currentScene->IsSceneChangeRequested()) {
+            std::string nextSceneName = currentScene->GetNextSceneName();
+            currentScene->Exit();
+            currentScene = scenes[nextSceneName];
+            currentScene->Enter();
+        }
     }
 }
 

@@ -20,3 +20,13 @@ void typewriter_print(const std::string& text, int delay_ms) {
     }
     std::cout << std::endl;
 }
+
+void loadIntro(std::string& intro)
+{
+    std::ifstream in{ "intro.txt" };
+    if (not in) return ;
+
+    std::ostringstream ss;
+    ss << in.rdbuf();   // ÇÙ½É ÇÑ ÁÙ
+    intro = ss.str();
+}

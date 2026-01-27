@@ -1,8 +1,9 @@
 #include "Scene.h"
+#include "Toolkit.h"
 
 void TitleScene::Enter()
 {
-
+	LoadIntro(introText);
 }
 
 void TitleScene::Update()

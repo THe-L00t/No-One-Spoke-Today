@@ -11,8 +11,18 @@ public:
 	virtual void Display() = 0;
 	virtual void Exit() = 0;
 
-private:
+	bool IsSceneChangeRequested() const { return sceneChangeRequested; }
+	std::string GetNextSceneName() const { return nextSceneName; }
 
+protected:
+	void RequestSceneChange(const std::string& sceneName) {
+		sceneChangeRequested = true;
+		nextSceneName = sceneName;
+	}
+
+private:
+	bool sceneChangeRequested = false;
+	std::string nextSceneName;
 };
 
 class TitleScene : public Scene 
@@ -25,7 +35,7 @@ public:
 	void Exit();
 
 private:
-
+	std::string introText;
 };
 
 class GameScene : public Scene
