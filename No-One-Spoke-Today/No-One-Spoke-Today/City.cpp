@@ -194,3 +194,18 @@ const CityMetrics& City::GetCityMet() const
 {
     return cityMet;
 }
+
+void City::ModifyMood(int delta)
+{
+    cityMet.mood = std::clamp(cityMet.mood + delta, 0, 10000);
+}
+
+void City::ModifyActivity(int delta)
+{
+    cityMet.activity = std::clamp(cityMet.activity + delta, 0, 10000);
+}
+
+void City::ModifyScarcity(int delta)
+{
+    cityMet.scarcity = std::clamp(cityMet.scarcity + delta, 0, 10000);
+}

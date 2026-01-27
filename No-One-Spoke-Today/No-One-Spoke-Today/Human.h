@@ -31,6 +31,15 @@ public:
 	EnergyState GetEnergy() const;
 	ControlState GetControl() const;
 
+	void ModifyStressLoad(int delta);
+	void ModifyEmotionalArousal(int delta);
+	void ModifyFatigue(int delta);
+	void ModifyCognitiveCapacity(int delta);
+	void ModifyInterpersonalTrust(int delta);
+	void ModifySocialSafety(int delta);
+	void ModifySenseOfControl(int delta);
+	void ModifyMotivation(int delta);
+
 private:
 	Trait traits;
 	Drives drives;

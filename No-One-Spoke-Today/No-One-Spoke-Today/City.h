@@ -13,6 +13,11 @@ public:
 	void Update(const std::vector<std::unique_ptr<Human>>&);
 	void Debug() const;
 	const CityMetrics& GetCityMet() const;
+
+	void ModifyMood(int delta);
+	void ModifyActivity(int delta);
+	void ModifyScarcity(int delta);
+
 private:
 	CityMetrics cityMet;
 

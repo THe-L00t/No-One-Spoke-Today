@@ -24,8 +24,13 @@ void World::Update(float deltaTime)
 	}
 	city->Update(humans);
 
-	// 이벤트 처리 (도시/인간 업데이트 이후)
-	eventManager->ProcessDailyEvents(*city, city->GetCityMet(), humans, currentDay);
+	// 하루 전환 시 이벤트 처리
+	accumulatedTime += deltaTime;
+	if (accumulatedTime >= dayDuration) {
+		accumulatedTime -= dayDuration;
+		currentDay++;
+		eventManager->ProcessDailyEvents(*city, city->GetCityMet(), humans, currentDay);
+	}
 }
 
 EventManager* World::GetEventManager()

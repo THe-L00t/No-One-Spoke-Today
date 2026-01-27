@@ -22,5 +22,8 @@ private:
 	std::vector<std::unique_ptr<Human>> humans;
 	std::unique_ptr<EventManager> eventManager;
 	int currentDay{};
+
+	float accumulatedTime{};
+	static constexpr float dayDuration = 480.0f; // 8분 = 480초
 };
 

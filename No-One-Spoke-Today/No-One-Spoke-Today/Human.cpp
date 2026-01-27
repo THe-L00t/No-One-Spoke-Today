@@ -235,3 +235,43 @@ ControlState Human::GetControl() const
     return state.control;
 }
 
+void Human::ModifyStressLoad(int delta)
+{
+    drives.stressLoad = std::clamp(drives.stressLoad + delta, 0, 10000);
+}
+
+void Human::ModifyEmotionalArousal(int delta)
+{
+    drives.emotionalArousal = std::clamp(drives.emotionalArousal + delta, 0, 10000);
+}
+
+void Human::ModifyFatigue(int delta)
+{
+    drives.fatigue = std::clamp(drives.fatigue + delta, 0, 10000);
+}
+
+void Human::ModifyCognitiveCapacity(int delta)
+{
+    drives.cognitiveCapacity = std::clamp(drives.cognitiveCapacity + delta, 0, 10000);
+}
+
+void Human::ModifyInterpersonalTrust(int delta)
+{
+    drives.interpersonalTrust = std::clamp(drives.interpersonalTrust + delta, 0, 10000);
+}
+
+void Human::ModifySocialSafety(int delta)
+{
+    drives.socialSafety = std::clamp(drives.socialSafety + delta, 0, 10000);
+}
+
+void Human::ModifySenseOfControl(int delta)
+{
+    drives.senseOfControl = std::clamp(drives.senseOfControl + delta, 0, 10000);
+}
+
+void Human::ModifyMotivation(int delta)
+{
+    drives.motivation = std::clamp(drives.motivation + delta, 0, 10000);
+}
+

@@ -5,112 +5,149 @@
 class City;
 class Human;
 
-// ========== 타입 별칭 ==========
+// ===== 열거형 =====
+enum class EventCategory { Environment, Personal, Social, CityWide };
 
-// 트리거 함수: 도시 지표와 인간 목록으로 이벤트 발생 조건을 판단
-using TriggerFunc = std::function<bool(const CityMetrics&, const std::vector<std::unique_ptr<Human>>&)>;
+enum class ConditionTarget {
+	// 도시 지표
+	CityMood, CityActivity, CityScarcity,
+	// 인간 성향 (고정값, 0~100)
+	HumanRationality, HumanAggressiveness, HumanPlanning,
+	HumanDependency, HumanRigidity, HumanEmotionalSensitivity,
+	// 인간 누적값 (동적, 0~10000)
+	HumanStressLoad, HumanEmotionalArousal, HumanFatigue,
+	HumanCognitiveCapacity, HumanInterpersonalTrust,
+	HumanSocialSafety, HumanSenseOfControl, HumanMotivation,
+	// 인간 정신상태 (enum int값)
+	HumanArousal, HumanSocial, HumanEnergy, HumanControl
+};
 
-// 효과 함수: 도시와 참여자에게 효과를 적용
-using EffectFunc = std::function<void(City&, std::vector<Human*>&)>;
+enum class CompareOp { Less, LessEq, Greater, GreaterEq, Equal, NotEqual };
 
-// 참여자 선택 함수: 전체 인간 목록에서 참여자를 선택
-using SelectorFunc = std::function<std::vector<Human*>(const std::vector<std::unique_ptr<Human>>&)>;
+enum class EffectType {
+	ModifyParticipantDrive,   // 참여자 누적값 변경
+	ModifyCityMetric,         // 도시 지표 변경
+	KillParticipant,          // 참여자 사망
+	AddImmigrant,             // 이주민 추가
+	Custom                    // 확장용 (향후 AI 등)
+};
 
+enum class DriveField {
+	StressLoad, EmotionalArousal, Fatigue, CognitiveCapacity,
+	InterpersonalTrust, SocialSafety, SenseOfControl, Motivation
+};
 
-// ========== 선택지 ==========
+enum class MetricField { Mood, Activity, Scarcity };
+
+// ===== 조건 (직렬화 가능) =====
+struct EventCondition {
+	ConditionTarget target;
+	CompareOp op;
+	int value;             // 비교 기준값
+	int minMatchCount;     // 인간 조건: 최소 충족 인원 (0=도시지표)
+};
+
+// ===== 효과 (직렬화 가능) =====
+struct EffectData {
+	EffectType type;
+	int targetField;       // DriveField 또는 MetricField의 int 캐스트
+	int delta;             // 변화량 / 사망수 / 이주민수
+	std::string customId;  // Custom 타입 식별자
+};
+
+// ===== 선택지 =====
 struct Choice {
-	std::string id;			// 레지스트리 키 (저장/로드용)
-	std::string text;		// 선택지 표시 텍스트
-	EffectFunc effect;		// 선택 시 적용되는 효과 함수
+	std::string text;
+	std::vector<EffectData> effects;
 };
 
-
-// ========== 이벤트 템플릿 ==========
-// 코드에 정의된 이벤트의 원형. 발생 조건과 선택지를 포함.
-struct EventTemplate {
-	std::string id;					// 고유 식별자 (예: "evt_riot")
-	std::string name;				// 이벤트 이름
-	std::string description;		// 이벤트 설명
-	bool requiresPlayer;			// 플레이어 선택이 필요한지 여부
-
-	std::string triggerFuncId;		// 트리거 함수 레지스트리 키
-	std::string selectorFuncId;		// 참여자 선택 함수 레지스트리 키
-
-	TriggerFunc trigger;			// 발동 조건 함수
-	SelectorFunc selector;			// 참여자 선택 함수
-	std::vector<Choice> choices;	// 선택지 목록
+// ===== 이벤트 정의 (바이너리 파일 저장 대상) =====
+struct EventDef {
+	std::string id;
+	std::string name;
+	std::string description;
+	EventCategory category;
+	bool requiresPlayer;
+	float baseProbability;       // 0.0~1.0
+	int cooldownDays;            // 재발동 대기일
+	int participantCount;        // 0=환경, 1=개인, N=사회
+	std::string selectorId;     // 참여자 선택 방식 (코드 매핑)
+	std::string customTriggerId; // 추가 트리거 함수 (선택, 빈 문자열=없음)
+	std::vector<EventCondition> conditions;
+	std::vector<Choice> choices;
 };
 
-
-// ========== 활성 이벤트 ==========
-// 현재 진행 중인 이벤트 인스턴스
+// ===== 활성 이벤트 =====
 struct ActiveEvent {
-	std::string templateId;				// 원본 EventTemplate의 id
-	std::string name;					// 이벤트 이름 (표시용)
-	std::string description;			// 이벤트 설명 (표시용)
-	bool requiresPlayer;				// 플레이어 선택 필요 여부
-	bool isActive;						// 현재 활성 상태
-	std::vector<Human*> participants;	// 선택된 참여자 목록
-	std::vector<Choice> choices;		// 선택지 (템플릿에서 복사)
-	int chosenIndex{ -1 };				// 플레이어가 선택한 인덱스 (-1 = 미선택)
+	std::string defId;
+	std::string name;
+	std::string description;
+	bool requiresPlayer;
+	bool isActive;
+	std::vector<Human*> participants;
+	std::vector<Choice> choices;
+	int chosenIndex{ -1 };
 };
 
+// ===== 타입 별칭 (코드 매핑용) =====
+using CustomTriggerFunc = std::function<bool(const CityMetrics&,
+	const std::vector<std::unique_ptr<Human>>&)>;
+using SelectorFunc = std::function<std::vector<Human*>(
+	const std::vector<std::unique_ptr<Human>>&, int count)>;
+using CustomEffectFunc = std::function<void(City&,
+	std::vector<Human*>&, std::vector<std::unique_ptr<Human>>&)>;
 
-// ========== 이벤트 매니저 ==========
+// ===== 이벤트 매니저 =====
 class EventManager {
 public:
 	EventManager();
 
-	// 매일 호출: 트리거 평가 -> 이벤트 활성화 -> 처리 (하루 최대 maxEventsPerDay개)
-	void ProcessDailyEvents(
-		City& city,
-		const CityMetrics& cityMet,
-		std::vector<std::unique_ptr<Human>>& humans,
-		int currentDay
-	);
+	// 이벤트 정의 바이너리 파일 로드/저장
+	void LoadEventDefs(const std::string& filepath);
+	void SaveEventDefs(const std::string& filepath) const;
 
-	// 플레이어 선택 대기 중인 이벤트가 있는지 확인
+	// 매일 호출 (World에서 하루 전환 시)
+	void ProcessDailyEvents(City& city, const CityMetrics& cityMet,
+		std::vector<std::unique_ptr<Human>>& humans, int currentDay);
+
+	// 플레이어 이벤트 처리
 	bool HasPendingPlayerEvent() const;
-
-	// 현재 플레이어에게 보여줄 활성 이벤트 반환
 	const ActiveEvent* GetPendingPlayerEvent() const;
+	void ApplyPlayerChoice(int choiceIndex, City& city,
+		std::vector<std::unique_ptr<Human>>& humans);
 
-	// 플레이어의 선택을 적용
-	void ApplyPlayerChoice(int choiceIndex, City& city);
-
-	// 이벤트 템플릿 등록 (게임 초기화 시)
-	void RegisterEventTemplate(const EventTemplate& tmpl);
-
-	// ===== 저장/로드 =====
-	void SaveEvents(std::ofstream& out) const;
-	void LoadEvents(std::ifstream& in);
-
-	// 로드 후 함수 포인터 재바인딩
-	void RebindFunctions();
-
-	// 로드 후 참여자 포인터 재선택
-	void ReselectParticipants(const std::vector<std::unique_ptr<Human>>& humans);
+	// 게임 상태 저장/로드 (세이브 파일용)
+	void SaveState(std::ofstream& out) const;
+	void LoadState(std::ifstream& in);
 
 private:
-	// 함수 레지스트리 등록 (생성자에서 호출)
-	void RegisterFunctions();
+	void RegisterSelectors();
+	void RegisterCustomTriggers();
+	void RegisterCustomEffects();
+	void RegisterDefaultEvents();
 
-	// 이벤트 템플릿에서 ActiveEvent 생성
-	ActiveEvent ActivateEvent(
-		const EventTemplate& tmpl,
-		const std::vector<std::unique_ptr<Human>>& humans
-	);
+	bool EvaluateConditions(const EventDef& def, const CityMetrics& cityMet,
+		const std::vector<std::unique_ptr<Human>>& humans) const;
+	bool CheckCondition(const EventCondition& cond, const CityMetrics& cityMet,
+		const std::vector<std::unique_ptr<Human>>& humans) const;
 
-	// 자동 이벤트 처리 (requiresPlayer == false)
-	void ProcessAutoEvent(ActiveEvent& event, City& city);
+	ActiveEvent ActivateEvent(const EventDef& def,
+		std::vector<std::unique_ptr<Human>>& humans);
+	void ProcessAutoEvent(ActiveEvent& event, City& city,
+		std::vector<std::unique_ptr<Human>>& humans);
+	void ApplyEffects(const std::vector<EffectData>& effects, City& city,
+		std::vector<Human*>& participants,
+		std::vector<std::unique_ptr<Human>>& humans);
 
-	// ===== 데이터 =====
-	std::vector<EventTemplate> templates;				// 등록된 이벤트 템플릿
-	std::deque<ActiveEvent> activeEvents;				// 현재 활성 이벤트 큐
-	int maxEventsPerDay{ 2 };							// 하루 최대 이벤트 수
+	std::vector<EventDef> definitions;
+	std::deque<ActiveEvent> activeEvents;
+	std::unordered_map<std::string, int> lastFiredDay; // 쿨다운 추적
+	int maxEventsPerDay{ 2 };
 
-	// ===== 함수 레지스트리 =====
-	std::unordered_map<std::string, TriggerFunc> triggerRegistry;
-	std::unordered_map<std::string, EffectFunc> effectRegistry;
+	// 코드 매핑 레지스트리 (소수 특수 케이스용)
 	std::unordered_map<std::string, SelectorFunc> selectorRegistry;
+	std::unordered_map<std::string, CustomTriggerFunc> customTriggerRegistry;
+	std::unordered_map<std::string, CustomEffectFunc> customEffectRegistry;
+
+	std::default_random_engine rng;
 };

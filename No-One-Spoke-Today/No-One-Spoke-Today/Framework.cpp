@@ -24,9 +24,8 @@ void Framework::Init()
 void Framework::Loop()
 {
     startTime = timer.get()->timer;
-    World w;
     currentScene = scenes["start"].get();
-    currentScene->Enter(w);
+    currentScene->Enter(world);
     while (true) {
         if (_kbhit()) {
             int input = _getch();
@@ -46,7 +45,7 @@ void Framework::Loop()
             std::string nextSceneName = currentScene->GetNextSceneName();
             currentScene->Exit();
             currentScene = scenes[nextSceneName].get();
-            currentScene->Enter(w);
+            currentScene->Enter(world);
         }
     }
 }
