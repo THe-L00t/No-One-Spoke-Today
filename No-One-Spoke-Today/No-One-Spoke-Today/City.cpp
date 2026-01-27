@@ -90,3 +90,15 @@ City::City(const std::vector<std::unique_ptr<Human>>& humans)
 
 
 }
+
+City::~City()
+{
+}
+
+void City::Debug() const
+{
+    std::cout << "============== City =================" << std::endl;
+    std::cout << "mood : " << cityMet.mood << std::endl;
+    std::cout << "activity : " << cityMet.activity << std::endl;
+    std::cout << "scarcity : " << cityMet.scarcity << std::endl;
+}

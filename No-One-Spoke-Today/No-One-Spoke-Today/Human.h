@@ -11,7 +11,7 @@ public:
 
 	void UpdateMentalState();
 
-	const int GetRationality() const;
+	int GetRationality() const;
 	int GetAggressiveness() const;
 	int GetPlanning() const;
 	int GetDependency() const;

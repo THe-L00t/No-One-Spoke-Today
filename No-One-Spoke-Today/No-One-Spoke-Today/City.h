@@ -1,5 +1,6 @@
 #pragma once
 #include "pch.h"
+class Human;
 
 struct CityMetrics {		// 0~10000
 	int mood;
@@ -12,6 +13,8 @@ class City
 public:
 	City(const std::vector<std::unique_ptr<Human>>&);
 	~City();
+
+	void Debug() const;
 
 private:
 	CityMetrics cityMet;

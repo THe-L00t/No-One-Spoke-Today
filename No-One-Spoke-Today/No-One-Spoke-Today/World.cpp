@@ -18,4 +18,5 @@ void World::Debug()
 	if (city not_eq nullptr)
 		std::cout << "city 문제 없음" << std::endl;
 	std::cout << humans.size() << std::endl;
+	city->Debug();
 }
