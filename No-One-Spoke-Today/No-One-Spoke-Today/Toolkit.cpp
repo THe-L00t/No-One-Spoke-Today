@@ -30,3 +30,23 @@ void LoadText(std::string& intro, const std::string& path)
     ss << in.rdbuf();   // 핵심 한 줄
     intro = ss.str();
 }
+
+std::vector<std::string> loadSentences(const std::string& filename) {
+    std::vector<std::string> sentences;
+    std::ifstream file(filename);
+
+    if (!file.is_open()) {
+        std::cerr << "파일을 열 수 없습니다: " << filename << "\n";
+        return sentences;
+    }
+
+    std::string line;
+    while (std::getline(file, line)) {
+        if (!line.empty()) {          // 빈 줄 무시
+            sentences.push_back(line);
+        }
+    }
+
+    file.close();
+    return sentences;
+}

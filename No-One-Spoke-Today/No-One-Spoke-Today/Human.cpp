@@ -285,3 +285,28 @@ bool Human::IsMale() const
     return male;
 }
 
+void Human::SetName(const std::string& n)
+{
+    name = n;
+}
+
+void Human::SetMale(bool m)
+{
+    male = m;
+}
+
+void Human::SetTraits(const Trait& t)
+{
+    traits = t;
+}
+
+void Human::SetDrives(const Drives& d)
+{
+    drives = d;
+}
+
+void Human::SetMentalState(const MentalState& ms)
+{
+    state = ms;
+}
+

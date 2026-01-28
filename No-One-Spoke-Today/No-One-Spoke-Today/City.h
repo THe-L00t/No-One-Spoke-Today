@@ -18,6 +18,8 @@ public:
 	void ModifyActivity(int delta);
 	void ModifyScarcity(int delta);
 
+	void SetCityMet(const CityMetrics& met);
+
 private:
 	CityMetrics cityMet;
 

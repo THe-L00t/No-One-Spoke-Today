@@ -209,3 +209,8 @@ void City::ModifyScarcity(int delta)
 {
     cityMet.scarcity = std::clamp(cityMet.scarcity + delta, 0, 10000);
 }
+
+void City::SetCityMet(const CityMetrics& met)
+{
+    cityMet = met;
+}

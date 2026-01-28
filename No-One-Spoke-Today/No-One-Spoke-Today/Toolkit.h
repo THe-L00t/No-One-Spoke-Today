@@ -11,3 +11,5 @@ inline void gotoxy(int x, int y)
     Cur.Y = y;
     SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), Cur);
 }
+
+std::vector<std::string> loadSentences(const std::string& filename);

@@ -22,6 +22,13 @@ public:
 	int GetMonth() const;
 	int GetDay() const;
 	float GetAccumulatedTime() const;
+
+	void SetCurrentDay(int d);
+	void SetMonth(int m);
+	void SetDay(int d);
+	void SetAccumulatedTime(float t);
+	void ClearHumans();
+	void AddHuman(std::unique_ptr<Human> h);
 private:
 	int currentDay{};
 	int month{ 4 };

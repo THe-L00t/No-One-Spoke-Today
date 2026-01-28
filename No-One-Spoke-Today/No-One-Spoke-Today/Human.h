@@ -43,6 +43,12 @@ public:
 	const std::string& GetName() const;
 	bool IsMale() const;
 
+	void SetName(const std::string& n);
+	void SetMale(bool m);
+	void SetTraits(const Trait& t);
+	void SetDrives(const Drives& d);
+	void SetMentalState(const MentalState& ms);
+
 private:
 	Trait traits;
 	Drives drives;

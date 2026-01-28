@@ -102,6 +102,7 @@ private:
 	};
 
 	World* world{ nullptr };
+	std::unique_ptr<World>* worldRef{ nullptr };
 	std::vector<MetaData> saveList;
 	MetaData foundSave[3]{};
 	int pageOffset{};

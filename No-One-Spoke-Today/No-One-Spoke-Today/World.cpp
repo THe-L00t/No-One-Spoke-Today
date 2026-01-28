@@ -81,3 +81,33 @@ float World::GetAccumulatedTime() const
 {
 	return accumulatedTime;
 }
+
+void World::SetCurrentDay(int d)
+{
+	currentDay = d;
+}
+
+void World::SetMonth(int m)
+{
+	month = m;
+}
+
+void World::SetDay(int d)
+{
+	day = d;
+}
+
+void World::SetAccumulatedTime(float t)
+{
+	accumulatedTime = t;
+}
+
+void World::ClearHumans()
+{
+	humans.clear();
+}
+
+void World::AddHuman(std::unique_ptr<Human> h)
+{
+	humans.push_back(std::move(h));
+}
