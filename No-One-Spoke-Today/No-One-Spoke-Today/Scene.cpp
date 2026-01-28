@@ -88,6 +88,10 @@ void GameScene::Exit()
 
 void GameScene::HandleInput(char input)
 {
+	switch (input) {
+	case 27:					//esc
+		RequestSceneChange("menu");
+	}
 }
 
 void GameScene::sHandleInput(char input)
@@ -96,6 +100,15 @@ void GameScene::sHandleInput(char input)
 
 void MenuScene::Enter(std::unique_ptr<World>&)
 {
+	LoadText(menu, "menu.txt");
+	typewriter_print(menu, 20);
+	std::string menu[3]{ " 계속하기 ", " 저장하기 ", " 처음으로 " };
+	for (size_t i = 0; i < 3; i++)
+	{
+		if (option == i) std::cout << "            >";
+		else std::cout << "              ";
+		typewriter_print(menu[i], 20);
+	}
 }
 
 void MenuScene::Update(float deltaTime)
@@ -104,6 +117,15 @@ void MenuScene::Update(float deltaTime)
 
 void MenuScene::Display()
 {
+	gotoxy(0, 0);
+	std::cout << menu << std::endl;
+	std::string menu[3]{ " 계속하기 ", " 저장하기 ", " 처음으로 " };
+	for (size_t i = 0; i < 3; i++)
+	{
+		if (option == i) std::cout << "            >";
+		else std::cout << "              ";
+		std::cout << menu[i] << std::endl;
+	}
 }
 
 void MenuScene::Exit()
@@ -113,11 +135,24 @@ void MenuScene::Exit()
 
 void MenuScene::HandleInput(char input)
 {
+	switch (input) {
+	case '\r':
+		if (option == 0) RequestSceneChange("play");
+		else if (option == 1) RequestSceneChange("save");
+		else if (option == 2) RequestSceneChange("start");
+	}
+	Display();
 }
 
 void MenuScene::sHandleInput(char input)
 {
-	
+	switch (input) {
+	case 72: if (option not_eq 0) option -= 1; break;		// 위
+	case 80: if (option not_eq 2) option += 1; break;		// 아래
+		//case 75: std::cout << "왼쪽\n"; break;		//왼
+		//case 77: std::cout << "오른쪽\n"; break;		//오
+	}
+	Display();
 }
 
 void SaveScene::Enter(std::unique_ptr<World>& w)
@@ -167,6 +202,14 @@ void SaveScene::Exit()
 
 void SaveScene::HandleInput(char input)
 {
+	switch (input) {
+	case 's':
+		break;
+	case 'l':
+		break;
+	case 27:
+		break;
+	}
 }
 
 void SaveScene::sHandleInput(char input)

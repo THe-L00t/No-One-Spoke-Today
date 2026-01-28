@@ -72,7 +72,8 @@ public:
 	void sHandleInput(char);
 
 private:
-
+	std::string menu;
+	int option{};
 };
 
 class SaveScene : public Scene

@@ -157,9 +157,45 @@
     <ClInclude Include="World.h" />
   </ItemGroup>
   <ItemGroup>
+    <Text Include="Aggressiveness.txt" />
+    <Text Include="Autonomous.txt" />
+    <Text Include="Calm.txt" />
+    <Text Include="Cooperative.txt" />
+    <Text Include="Dependency.txt" />
+    <Text Include="Dependent.txt" />
+    <Text Include="Emotional Sensitivity.txt" />
+    <Text Include="Exhausted.txt" />
+    <Text Include="Fatigued.txt" />
+    <Text Include="High Arousal.txt" />
+    <Text Include="High Cognitive.txt" />
+    <Text Include="High Control.txt" />
+    <Text Include="High Fatigue.txt" />
+    <Text Include="High Motivation.txt" />
+    <Text Include="High Safety.txt" />
+    <Text Include="High Stress.txt" />
+    <Text Include="High Trust.txt" />
+    <Text Include="Hostile.txt" />
     <Text Include="intro.txt" />
+    <Text Include="Irritable.txt" />
+    <Text Include="Low Arousal.txt" />
+    <Text Include="Low Cognitive.txt" />
+    <Text Include="Low Control.txt" />
+    <Text Include="Low Fatigue.txt" />
+    <Text Include="Low Motivation.txt" />
+    <Text Include="Low Safety.txt" />
+    <Text Include="Low Stress.txt" />
+    <Text Include="Low Trust.txt" />
+    <Text Include="menu.txt" />
+    <Text Include="Neutral.txt" />
+    <Text Include="Normal.txt" />
+    <Text Include="Planning.txt" />
+    <Text Include="Rationality.txt" />
+    <Text Include="Rigidity.txt" />
+    <Text Include="Stubborn.txt" />
+    <Text Include="Tense.txt" />
     <Text Include="title.txt" />
     <Text Include="titleASCIIart.txt" />
+    <Text Include="Withdrawn.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
