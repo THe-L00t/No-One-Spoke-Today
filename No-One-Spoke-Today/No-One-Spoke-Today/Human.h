@@ -40,6 +40,9 @@ public:
 	void ModifySenseOfControl(int delta);
 	void ModifyMotivation(int delta);
 
+	const std::string& GetName() const;
+	bool IsMale() const;
+
 private:
 	Trait traits;
 	Drives drives;

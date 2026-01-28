@@ -1,6 +1,7 @@
 #pragma once
 #include "pch.h"
 #include "World.h"
+
 class Scene
 {
 public:
@@ -23,6 +24,7 @@ protected:
 		nextSceneName = sceneName;
 	}
 	bool sceneChangeRequested = false;
+	static std::string oldScene;
 
 private:
 	std::string nextSceneName;
@@ -95,7 +97,7 @@ private:
 
 	struct MetaData {
 		unsigned short slotNum{};
-		std::string worldName{ "ºñ¾îÀÖÀ½" };
+		std::string worldName{ "ë¹„ì–´ìˆìŒ" };
 		int days{};
 	};
 
@@ -104,4 +106,5 @@ private:
 	MetaData foundSave[3]{};
 	int pageOffset{};
 	bool saveAble{ false };
+	int option{};
 };

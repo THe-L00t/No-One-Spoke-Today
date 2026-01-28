@@ -275,3 +275,13 @@ void Human::ModifyMotivation(int delta)
     drives.motivation = std::clamp(drives.motivation + delta, 0, 10000);
 }
 
+const std::string& Human::GetName() const
+{
+    return name;
+}
+
+bool Human::IsMale() const
+{
+    return male;
+}
+

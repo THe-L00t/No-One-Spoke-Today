@@ -43,10 +43,41 @@ City* World::GetCity()
 	return city.get();
 }
 
+Human* World::GetHumans(int idx)
+{
+	return humans[idx].get();
+}
+
+int World::GetHumansSize() const
+{
+	return humans.size();
+}
+
+
 void World::Debug()
 {
 	if (city not_eq nullptr)
 		std::cout << "city 문제 없음" << std::endl;
 	std::cout << humans.size() << std::endl;
 	city->Debug();
+}
+
+int World::GetCurrentDay() const
+{
+	return currentDay;
+}
+
+int World::GetMonth() const
+{
+	return month;
+}
+
+int World::GetDay() const
+{
+	return day;
+}
+
+float World::GetAccumulatedTime() const
+{
+	return accumulatedTime;
 }

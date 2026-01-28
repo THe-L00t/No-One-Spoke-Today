@@ -16,14 +16,22 @@ public:
 
 	EventManager* GetEventManager();
 	City* GetCity();
-
+	Human* GetHumans(int);
+	int GetHumansSize() const;
+	int GetCurrentDay() const;
+	int GetMonth() const;
+	int GetDay() const;
+	float GetAccumulatedTime() const;
 private:
-	std::unique_ptr<City> city;
-	std::vector<std::unique_ptr<Human>> humans;
-	std::unique_ptr<EventManager> eventManager;
 	int currentDay{};
+	int month{ 4 };
+	int day{ 12 };
 
 	float accumulatedTime{};
 	static constexpr float dayDuration = 480.0f; // 8분 = 480초
+
+	std::unique_ptr<City> city;
+	std::vector<std::unique_ptr<Human>> humans;
+	std::unique_ptr<EventManager> eventManager;
 };
 
