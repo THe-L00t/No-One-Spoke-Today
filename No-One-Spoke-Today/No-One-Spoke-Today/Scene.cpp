@@ -78,7 +78,15 @@ void GameScene::Enter(std::unique_ptr<World>& w)
 
 void GameScene::Update(float deltaTime)
 {
+	if (not world) return;
 
+	world->Update(deltaTime);
+
+	int today = world->GetCurrentDay();
+	if (today != lastDay) {
+		dayLog.clear();
+		CityMetrics cm = world->GetCity()->GetCityMet();
+	}
 }
 
 void GameScene::Display()

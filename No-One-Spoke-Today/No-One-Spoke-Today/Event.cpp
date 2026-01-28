@@ -2,6 +2,11 @@
 #include "City.h"
 #include "Human.h"
 
+
+
+const EventCode& EncodingEvent(const City& city, const std::vector<std::unique_ptr<Human>>& humans) {
+
+}
 // ========== 바이너리 I/O 헬퍼 ==========
 namespace {
 	void WriteString(std::ofstream& out, const std::string& s) {

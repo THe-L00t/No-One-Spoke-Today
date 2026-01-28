@@ -60,6 +60,12 @@ public:
 
 private:
 	World* world{ nullptr };
+
+	std::vector<std::string> dayLog;
+	std::unordered_map<std::string, std::vector<std::string>> sentences;
+	int lastDay{ -1 };
+	bool waitingForChoice{ false };
+	float sentenceTimer{ 0.f };
 };
 
 class MenuScene : public Scene

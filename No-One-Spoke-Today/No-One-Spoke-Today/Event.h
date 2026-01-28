@@ -5,6 +5,16 @@
 class City;
 class Human;
 
+
+struct EventCode {
+	uint64_t code2_6;		// 최상위 2바이트 이벤트 구분 - 6바이트 상태
+	uint64_t code75_05;		// 상태 7.5바이트 - 0.5바이트 누적
+	uint64_t code35_3_15;	// 누적 3.5바이트 - 3바이트 성향 - 1.5바이트 도시
+};
+const EventCode& EncodingEvent(const City&, const std::vector<std::unique_ptr<Human>>&);
+
+
+
 // ===== 열거형 =====
 enum class EventCategory { Environment, Personal, Social, CityWide };
 
