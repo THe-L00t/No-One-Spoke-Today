@@ -80,6 +80,11 @@ void GameScene::Enter(std::unique_ptr<World>& w)
 	system("cls");
 	if (not w) w = std::make_unique<World>();
 
+	// 월드가 바뀌면 대사 로그 클리어
+	if (world != w.get()) {
+		dayLog.clear();
+	}
+
 	world = w.get();
 	InitDayMessages();
 
@@ -94,6 +99,7 @@ void GameScene::Enter(std::unique_ptr<World>& w)
 	eventDisplayed = false;
 	statusUpdateTimer = 0.f;
 	dialogueTimer = 0.f;
+	nextDialogueInterval = GetRandomDialogueInterval();
 }
 
 void GameScene::Update(float deltaTime)
@@ -123,6 +129,10 @@ void GameScene::Update(float deltaTime)
 	// 하루 시작 문구 표시
 	if (!dayStartDisplayed) {
 		DisplayDayStart();
+		// 저장된 대사들 다시 출력
+		for (const auto& d : dayLog) {
+			std::println("    \"{}\"\n", d);
+		}
 		dayStartDisplayed = true;
 	}
 
@@ -144,6 +154,10 @@ void GameScene::Update(float deltaTime)
 			waitingForChoice = false;
 			system("cls");
 			DisplayDayStart();
+			// 저장된 대사들 다시 출력
+			for (const auto& d : dayLog) {
+				std::println("    \"{}\"", d);
+			}
 		}
 
 		statusUpdateTimer += deltaTime;
@@ -153,8 +167,9 @@ void GameScene::Update(float deltaTime)
 		}
 
 		dialogueTimer += deltaTime;
-		if (dialogueTimer >= DIALOGUE_INTERVAL) {
+		if (dialogueTimer >= nextDialogueInterval) {
 			dialogueTimer = 0.f;
+			nextDialogueInterval = GetRandomDialogueInterval();
 			DisplayCitizenDialogue();
 		}
 	}
@@ -297,6 +312,7 @@ void SaveScene::Enter(std::unique_ptr<World>& w)
 	}
 	worldRef = &w;
 	LoadMeta();
+	Update(0);  // foundSave 초기화
 	Display();
 }
 
@@ -353,12 +369,34 @@ void SaveScene::HandleInput(char input)
 	switch (input) {
 	case 's':
 		if (saveAble) {
+			// 이미 저장된 슬롯인지 확인
+			if (!foundSave[option].worldName.empty() && foundSave[option].worldName != "비어있음") {
+				std::cout << "이미 저장된 데이터가 있습니다. 덮어쓰시겠습니까? (y/n): ";
+				char confirm = _getch();
+				if (confirm != 'y' && confirm != 'Y') {
+					std::cout << "취소됨" << std::endl;
+					break;
+				}
+			}
 			SaveWorld();
 			system("cls");
 			Display();
 		}
 		break;
 	case 'l':
+		// 빈 슬롯에서 로드 방지
+		if (foundSave[option].worldName.empty() || foundSave[option].worldName == "비어있음") {
+			std::cout << "해당 슬롯에 저장된 데이터가 없습니다." << std::endl;
+			break;
+		}
+		std::cout << "'" << foundSave[option].worldName << "' 을(를) 로드하시겠습니까? (y/n): ";
+		{
+			char confirm = _getch();
+			if (confirm != 'y' && confirm != 'Y') {
+				std::cout << "취소됨" << std::endl;
+				break;
+			}
+		}
 		LoadWorld();
 		RequestSceneChange("play");
 		break;
@@ -384,6 +422,7 @@ void SaveScene::LoadMeta()
 	saveList.clear();
 	std::ifstream in{ "data/savefile", std::ios::binary };
 	if (!in.is_open()) {
+		std::cout << "[DEBUG] data/savefile 파일을 열 수 없습니다." << std::endl;
 		return;
 	}
 	while (in.good() && in.peek() != EOF) {
@@ -392,7 +431,7 @@ void SaveScene::LoadMeta()
 		if (!in.good()) break;
 		uint32_t nameLen;
 		in.read(reinterpret_cast<char*>(&nameLen), sizeof(nameLen));
-		if (!in.good() || nameLen > 1000) break;  // sanity check
+		if (!in.good() || nameLen > 1000) break;
 		d.worldName.resize(nameLen);
 		in.read(d.worldName.data(), nameLen);
 		if (!in.good()) break;
@@ -400,13 +439,18 @@ void SaveScene::LoadMeta()
 		if (in.good()) saveList.push_back(d);
 	}
 	in.close();
+	std::cout << "[DEBUG] 로드된 세이브 수: " << saveList.size() << std::endl;
 }
 
 void SaveScene::SaveMeta()
 {
+	std::cout << "[DEBUG] SaveMeta 호출, saveList.size() = " << saveList.size() << std::endl;
 	CreateDirectoryA("data", NULL);
 	std::ofstream out{ "data/savefile", std::ios::binary | std::ios::trunc };
-	if (!out.is_open()) return;
+	if (!out.is_open()) {
+		std::cout << "[DEBUG] data/savefile 쓰기 실패" << std::endl;
+		return;
+	}
 	for (auto& data : saveList) {
 		out.write(reinterpret_cast<const char*>(&data.slotNum), sizeof(data.slotNum));
 		uint32_t nameLen = static_cast<uint32_t>(data.worldName.size());
@@ -415,6 +459,7 @@ void SaveScene::SaveMeta()
 		out.write(reinterpret_cast<const char*>(&data.days), sizeof(data.days));
 	}
 	out.close();
+	std::cout << "[DEBUG] SaveMeta 완료" << std::endl;
 }
 
 void SaveScene::LoadWorld()
@@ -699,30 +744,29 @@ void GameScene::DisplayDayStart()
 	int avgStress = CalculateAverageStress();
 	int avgFatigue = CalculateAverageFatigue();
 
-	std::string greeting = GetRandomMessage("greeting");
-	std::string wheel = GetRandomMessage("wheel");
+	// 하루 단위로 일지 메시지 설정
+	currentGreeting = GetRandomMessage("greeting");
+	currentWheel = GetRandomMessage("wheel");
 
 	// 대시보드 스타일 출력 (std::print 사용)
 	std::println("");
 	std::println("  ╔════════════════════════════════════════════════╗");
-	std::println("  ║  2156년 {:>2}월 {:>2}일                      Day {:>3} ║", month, dayOfMonth, totalDay);
+	std::println("  ║  2156년 {:>2}월 {:>2}일                      Day {:>3} ║", month, dayOfMonth, totalDay+1);
 	std::println("  ╠════════════════════════════════════════════════╣");
 	std::println("  ║  [도시 상태]             [시민 상태]           ║");
 	std::println("  ║  > 분위기: {:<8}     > 인구: {:>4}명         ║", moodText, population);
-	std::println("  ║  > 활동량: {:<8}     > 평균 스트레스: {:>3}%  ║", activityText, avgStress / 100);
+	std::println("  ║  > 활동량: {:<10}   > 평균 스트레스: {:>3}%  ║", activityText, avgStress / 100);
 	std::println("  ║  > 결핍도: {:<8}     > 평균 피로도: {:>3}%    ║", scarcityText, avgFatigue / 100);
 	std::println("  ╠════════════════════════════════════════════════╣");
 	std::println("  ║  [오늘의 일지]                                 ║");
-	std::println("  ║  {:44}  ║", greeting);
-	std::println("  ║  {:44}  ║", wheel);
+	std::println("  ║  {:44}  ║", currentGreeting);
+	std::println("  ║  {:44}  ║", currentWheel);
+	std::println("  ╠════════════════════════════════════════════════╣");
+	std::println("  ║  [진행률] ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   0%  ║");
+	std::println("  ║            0분 /  8분                          ║");
 	std::println("  ╚════════════════════════════════════════════════╝");
 	std::println("    [ESC] 메뉴  [S] 상세 상태");
 	std::println("");
-
-	// 저장된 대사들 다시 출력
-	for (const auto& dialogue : dayLog) {
-		std::println("    \"{}\"", dialogue);
-	}
 }
 
 void GameScene::DisplayEvent()
@@ -784,20 +828,50 @@ void GameScene::DisplayStatus()
 {
 	if (!world) return;
 
+	system("cls");
+
+	// 대시보드 상단 (고정 부분)
+	int month = world->GetMonth();
+	int dayOfMonth = world->GetDay();
+	int totalDay = world->GetCurrentDay();
+	int population = world->GetHumansSize();
 	const CityMetrics& cm = world->GetCity()->GetCityMet();
+
+	std::string moodText = GetMoodText(cm.mood);
+	std::string activityText = GetActivityText(cm.activity);
+	std::string scarcityText = GetScarcityText(cm.scarcity);
+	int avgStress = CalculateAverageStress();
+	int avgFatigue = CalculateAverageFatigue();
+
 	float accTime = world->GetAccumulatedTime();
 	float ratio = accTime / 480.0f;
 	std::string progressBar = GetProgressBar(ratio, 30);
-
 	int minutes = static_cast<int>(accTime / 60.0f);
 	int totalMinutes = 8;
 
-	// 고정 위치(17번째 줄)에 진행률 표시
-	gotoxy(0, 15);
-	std::print("  ╠════════════════════════════════════════════════╣\n");
-	std::print("  ║  [진행률] {} {:>3}%  ║\n", progressBar, static_cast<int>(ratio * 100));
-	std::print("  ║           {:>2}분 / {:>2}분                          ║\n", minutes, totalMinutes);
-	std::print("  ╚════════════════════════════════════════════════╝\n");
+	std::println("");
+	std::println("  ╔════════════════════════════════════════════════╗");
+	std::println("  ║  2156년 {:>2}월 {:>2}일                      Day {:>3} ║", month, dayOfMonth, totalDay+1);
+	std::println("  ╠════════════════════════════════════════════════╣");
+	std::println("  ║  [도시 상태]             [시민 상태]           ║");
+	std::println("  ║  > 분위기: {:<8}     > 인구: {:>4}명         ║", moodText, population);
+	std::println("  ║  > 활동량: {:<10}   > 평균 스트레스: {:>3}%  ║", activityText, avgStress / 100);
+	std::println("  ║  > 결핍도: {:<8}     > 평균 피로도: {:>3}%    ║", scarcityText, avgFatigue / 100);
+	std::println("  ╠════════════════════════════════════════════════╣");
+	std::println("  ║  [오늘의 일지]                                 ║");
+	std::println("  ║  {:44}  ║", currentGreeting);
+	std::println("  ║  {:44}  ║", currentWheel);
+	std::println("  ╠════════════════════════════════════════════════╣");
+	std::println("  ║  [진행률] {} {:>3}%  ║", progressBar, static_cast<int>(ratio * 100));
+	std::println("  ║           {:>2}분 / {:>2}분                          ║", minutes, totalMinutes);
+	std::println("  ╚════════════════════════════════════════════════╝");
+	std::println("    [ESC] 메뉴  [S] 상세 상태");
+	std::println("");
+
+	// 저장된 대사들 다시 출력
+	for (const auto& d : dayLog) {
+		std::println("    \"{}\"\n", d);
+	}
 }
 
 void GameScene::DisplayDayTransition()
@@ -917,36 +991,59 @@ void GameScene::LoadDialogueFiles()
 	dialogues["Low Control"] = loadSentences("data/dialogues/Low Control.txt");
 }
 
-Human* GameScene::FindCitizenClosestToMood(int targetMood)
+std::vector<std::string> GameScene::GetMatchingDialogueKeys(Human* h)
 {
-	if (!world || world->GetHumansSize() == 0) return nullptr;
+	std::vector<std::string> keys;
 
-	Human* closest = nullptr;
-	int minDiff = INT_MAX;
-
-	int count = world->GetHumansSize();
-	for (int i = 0; i < count; ++i) {
-		Human* h = world->GetHumans(i);
-
-		// 시민의 개인 분위기 계산 (간략화)
-		int personalMood = 5000;
-		switch (h->GetArousal()) {
-		case ArousalState::Calm: personalMood += 1500; break;
-		case ArousalState::Tense: personalMood += 500; break;
-		case ArousalState::Irritable: personalMood -= 500; break;
-		case ArousalState::Hostile: personalMood -= 1500; break;
-		}
-		personalMood -= h->GetStressLoad() / 2;
-		personalMood += h->GetMotivation() / 2;
-
-		int diff = std::abs(personalMood - targetMood);
-		if (diff < minDiff) {
-			minDiff = diff;
-			closest = h;
-		}
+	// 상태 기반
+	switch (h->GetArousal()) {
+	case ArousalState::Calm: keys.push_back("Calm"); break;
+	case ArousalState::Tense: keys.push_back("Tense"); break;
+	case ArousalState::Irritable: keys.push_back("Irritable"); break;
+	case ArousalState::Hostile: keys.push_back("Hostile"); break;
+	}
+	switch (h->GetSocial()) {
+	case SocialState::Neutral: keys.push_back("Neutral"); break;
+	case SocialState::Cooperative: keys.push_back("Cooperative"); break;
+	case SocialState::Withdrawn: keys.push_back("Withdrawn"); break;
+	}
+	switch (h->GetEnergy()) {
+	case EnergyState::Normal: keys.push_back("Normal"); break;
+	case EnergyState::Fatigued: keys.push_back("Fatigued"); break;
+	case EnergyState::Exhausted: keys.push_back("Exhausted"); break;
+	}
+	switch (h->GetControl()) {
+	case ControlState::Autonomous: keys.push_back("Autonomous"); break;
+	case ControlState::Dependent: keys.push_back("Dependent"); break;
+	case ControlState::Stubborn: keys.push_back("Stubborn"); break;
 	}
 
-	return closest;
+	// 누적값 기반 (극단적인 경우만)
+	if (h->GetStressLoad() > 7000) keys.push_back("High Stress");
+	else if (h->GetStressLoad() < 3000) keys.push_back("Low Stress");
+
+	if (h->GetFatigue() > 7000) keys.push_back("High Fatigue");
+	else if (h->GetFatigue() < 3000) keys.push_back("Low Fatigue");
+
+	if (h->GetMotivation() > 7000) keys.push_back("High Motivation");
+	else if (h->GetMotivation() < 3000) keys.push_back("Low Motivation");
+
+	if (h->GetEmotionalArousal() > 7000) keys.push_back("High Arousal");
+	else if (h->GetEmotionalArousal() < 3000) keys.push_back("Low Arousal");
+
+	if (h->GetCognitiveCapacity() > 7000) keys.push_back("High Cognitive");
+	else if (h->GetCognitiveCapacity() < 3000) keys.push_back("Low Cognitive");
+
+	if (h->GetInterpersonalTrust() > 7000) keys.push_back("High Trust");
+	else if (h->GetInterpersonalTrust() < 3000) keys.push_back("Low Trust");
+
+	if (h->GetSocialSafety() > 7000) keys.push_back("High Safety");
+	else if (h->GetSocialSafety() < 3000) keys.push_back("Low Safety");
+
+	if (h->GetSenseOfControl() > 7000) keys.push_back("High Control");
+	else if (h->GetSenseOfControl() < 3000) keys.push_back("Low Control");
+
+	return keys;
 }
 
 std::string GameScene::GetDialogueForState(const std::string& stateKey)
@@ -960,67 +1057,32 @@ std::string GameScene::GetDialogueForState(const std::string& stateKey)
 	return it->second[dist(rng)];
 }
 
+float GameScene::GetRandomDialogueInterval()
+{
+	std::uniform_real_distribution<float> dist(3.0f, 8.0f);
+	return dist(rng);
+}
+
 void GameScene::DisplayCitizenDialogue()
 {
-	if (!world) return;
+	if (!world || world->GetHumansSize() == 0) return;
 
-	const CityMetrics& cm = world->GetCity()->GetCityMet();
-	Human* speaker = FindCitizenClosestToMood(cm.mood);
+	// 랜덤 시민 선택
+	std::uniform_int_distribution<int> personDist(0, world->GetHumansSize() - 1);
+	Human* speaker = world->GetHumans(personDist(rng));
 	if (!speaker) return;
 
-	// 화자의 상태에 따른 대사 키 결정
-	std::string stateKey;
+	// 해당 시민의 성향/누적값/상태에 맞는 대사 키들 수집
+	std::vector<std::string> keys = GetMatchingDialogueKeys(speaker);
+	if (keys.empty()) return;
 
-	// 1순위: 가장 극단적인 정신상태 기준
-	ArousalState arousal = speaker->GetArousal();
-	if (arousal == ArousalState::Hostile) {
-		stateKey = "Hostile";
-	}
-	else if (arousal == ArousalState::Irritable) {
-		stateKey = "Irritable";
-	}
-	else if (arousal == ArousalState::Tense) {
-		stateKey = "Tense";
-	}
-	else {
-		// Calm일 때는 다른 상태 확인
-		EnergyState energy = speaker->GetEnergy();
-		if (energy == EnergyState::Exhausted) {
-			stateKey = "Exhausted";
-		}
-		else if (energy == EnergyState::Fatigued) {
-			stateKey = "Fatigued";
-		}
-		else {
-			// 누적값 기준
-			if (speaker->GetStressLoad() > 7000) {
-				stateKey = "High Stress";
-			}
-			else if (speaker->GetMotivation() > 7000) {
-				stateKey = "High Motivation";
-			}
-			else if (speaker->GetMotivation() < 3000) {
-				stateKey = "Low Motivation";
-			}
-			else {
-				// 사회적 상태
-				SocialState social = speaker->GetSocial();
-				if (social == SocialState::Cooperative) {
-					stateKey = "Cooperative";
-				}
-				else if (social == SocialState::Withdrawn) {
-					stateKey = "Withdrawn";
-				}
-				else {
-					stateKey = "Neutral";
-				}
-			}
-		}
-	}
+	// 키 중 랜덤 선택
+	std::uniform_int_distribution<size_t> keyDist(0, keys.size() - 1);
+	std::string stateKey = keys[keyDist(rng)];
 
+	// 해당 키의 대사 가져오기
 	std::string dialogue = GetDialogueForState(stateKey);
 	if (dialogue.empty()) {
-		// 기본 대사
 		dialogue = "...";
 	}
 

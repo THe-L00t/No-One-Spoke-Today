@@ -75,20 +75,23 @@ private:
 	std::string GetDialogueForState(const std::string& stateKey);
 	int CalculateAverageStress();
 	int CalculateAverageFatigue();
-	Human* FindCitizenClosestToMood(int targetMood);
+	std::vector<std::string> GetMatchingDialogueKeys(Human* h);
+	float GetRandomDialogueInterval();
 
 	World* world{ nullptr };
 
 	std::vector<std::string> dayLog;
 	std::unordered_map<std::string, std::vector<std::string>> dayMessages;
 	std::unordered_map<std::string, std::vector<std::string>> dialogues;  // 상태별 대사
+	std::string currentGreeting;  // 하루 단위 고정
+	std::string currentWheel;     // 하루 단위 고정
 	int lastDay{ -1 };
 	bool waitingForChoice{ false };
 	bool eventDisplayed{ false };
 	float statusUpdateTimer{ 0.f };
 	float dialogueTimer{ 0.f };
+	float nextDialogueInterval{ 5.0f };
 	static constexpr float STATUS_UPDATE_INTERVAL = 3.0f;
-	static constexpr float DIALOGUE_INTERVAL = 5.0f;
 	bool dayStartDisplayed{ false };
 	bool dayTransitionShown{ false };
 	bool firstVisit{ true };

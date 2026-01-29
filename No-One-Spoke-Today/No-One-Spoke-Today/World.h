@@ -31,7 +31,7 @@ public:
 	void ClearHumans();
 	void AddHuman(std::unique_ptr<Human> h);
 private:
-	int currentDay{};
+	int currentDay{ 1 };
 	int month{ 4 };
 	int day{ 12 };
 
