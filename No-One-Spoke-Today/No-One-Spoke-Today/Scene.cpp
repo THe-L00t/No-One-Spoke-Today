@@ -801,7 +801,7 @@ void GameScene::DisplayEvent()
 	std::cout << "  └────────────────────────────────────────┘" << std::endl;
 
 	std::cout << std::endl;
-	typewriter_print("  " + event->description, 12);
+	typewriter_print("  " + event->description, 12);  
 	std::cout << std::endl;
 	std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
