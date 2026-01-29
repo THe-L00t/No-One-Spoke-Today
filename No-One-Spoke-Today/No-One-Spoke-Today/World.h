@@ -18,6 +18,7 @@ public:
 	City* GetCity();
 	Human* GetHumans(int);
 	int GetHumansSize() const;
+	std::vector<std::unique_ptr<Human>>& GetHumansVector();
 	int GetCurrentDay() const;
 	int GetMonth() const;
 	int GetDay() const;

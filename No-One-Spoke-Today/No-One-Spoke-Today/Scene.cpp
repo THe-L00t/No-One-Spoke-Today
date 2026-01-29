@@ -1,5 +1,6 @@
 #include "Scene.h"
 #include "Toolkit.h"
+#include <iomanip>
 
 std::string Scene::oldScene;
 
@@ -8,13 +9,20 @@ void TitleScene::Enter(std::unique_ptr<World>&)
 	LoadText(title, "title.txt");
 	LoadText(intro, "intro.txt");
 	system("cls");
-	typewriter_print(title, 20);
-	std::string menu[3]{ " 새로하기 ", " 이어하기 ", " 종료하기 " };
-	for (size_t i = 0; i < 3; i++)
-	{
-		if (option == i) std::cout << "            >";
-		else std::cout << "              ";
-		typewriter_print(menu[i], 20);
+
+	if (firstVisit) {
+		typewriter_print(title, 20);
+		std::string menu[3]{ " 새로하기 ", " 이어하기 ", " 종료하기 " };
+		for (size_t i = 0; i < 3; i++)
+		{
+			if (option == i) std::cout << "            >";
+			else std::cout << "              ";
+			typewriter_print(menu[i], 20);
+		}
+		firstVisit = false;
+	}
+	else {
+		Display();
 	}
 }
 
@@ -40,7 +48,7 @@ void TitleScene::Exit()
 {
 	sceneChangeRequested = false;
 	system("cls");
-	//if(option == 0) typewriter_print(intro);
+	if(option == 0) typewriter_print(intro);
 	oldScene = "start";
 }
 
@@ -71,21 +79,84 @@ void GameScene::Enter(std::unique_ptr<World>& w)
 {
 	system("cls");
 	if (not w) w = std::make_unique<World>();
-		
-	world = w.get(); 
-	
+
+	world = w.get();
+	InitDayMessages();
+
+	if (!dialoguesLoaded) {
+		LoadDialogueFiles();
+		dialoguesLoaded = true;
+	}
+
+	lastDay = world->GetCurrentDay();
+	dayStartDisplayed = false;
+	waitingForChoice = false;
+	eventDisplayed = false;
+	statusUpdateTimer = 0.f;
+	dialogueTimer = 0.f;
 }
 
 void GameScene::Update(float deltaTime)
 {
 	if (not world) return;
 
-	world->Update(deltaTime);
+	// 이벤트 선택 대기 중이면 시뮬레이션 일시정지
+	if (!waitingForChoice) {
+		world->Update(deltaTime);
+	}
 
 	int today = world->GetCurrentDay();
 	if (today != lastDay) {
+		// 하루 전환 연출
+		if (lastDay >= 0 && !dayTransitionShown) {
+			DisplayDayTransition();
+			dayTransitionShown = true;
+		}
+		lastDay = today;
 		dayLog.clear();
-		CityMetrics cm = world->GetCity()->GetCityMet();
+		dayStartDisplayed = false;
+		eventDisplayed = false;
+		dayTransitionShown = false;
+		dialogueTimer = 0.f;
+	}
+
+	// 하루 시작 문구 표시
+	if (!dayStartDisplayed) {
+		DisplayDayStart();
+		dayStartDisplayed = true;
+	}
+
+	// 이벤트 체크 및 표시
+	EventManager* em = world->GetEventManager();
+	if (em && em->HasPendingPlayerEvent()) {
+		if (!waitingForChoice) {
+			waitingForChoice = true;
+			eventDisplayed = false;
+		}
+		if (!eventDisplayed) {
+			DisplayEvent();
+			eventDisplayed = true;
+		}
+	}
+	else {
+		// 이벤트가 없으면 시민 대사 표시
+		if (waitingForChoice) {
+			waitingForChoice = false;
+			system("cls");
+			DisplayDayStart();
+		}
+
+		statusUpdateTimer += deltaTime;
+		if (statusUpdateTimer >= STATUS_UPDATE_INTERVAL) {
+			statusUpdateTimer = 0.f;
+			DisplayStatus();
+		}
+
+		dialogueTimer += deltaTime;
+		if (dialogueTimer >= DIALOGUE_INTERVAL) {
+			dialogueTimer = 0.f;
+			DisplayCitizenDialogue();
+		}
 	}
 }
 
@@ -102,9 +173,47 @@ void GameScene::Exit()
 
 void GameScene::HandleInput(char input)
 {
+	// 이벤트 선택 처리
+	if (waitingForChoice && world) {
+		EventManager* em = world->GetEventManager();
+		if (em && em->HasPendingPlayerEvent()) {
+			const ActiveEvent* event = em->GetPendingPlayerEvent();
+			int choiceIndex = -1;
+
+			if (input >= '1' && input <= '9') {
+				choiceIndex = input - '1';
+			}
+
+			if (choiceIndex >= 0 && choiceIndex < static_cast<int>(event->choices.size())) {
+				// 선택한 텍스트 저장 (ApplyPlayerChoice 후 event가 사라지므로)
+				std::string chosenText = event->choices[choiceIndex].text;
+
+				// 선택 적용
+				em->ApplyPlayerChoice(choiceIndex, *world->GetCity(), world->GetHumansVector());
+
+				waitingForChoice = false;
+				eventDisplayed = false;
+				system("cls");
+				DisplayDayStart();
+
+				// 선택 결과 표시
+				std::cout << std::endl;
+				std::cout << "    >> 선택 완료: " << chosenText << std::endl;
+				std::cout << std::endl;
+				return;
+			}
+		}
+	}
+
 	switch (input) {
 	case 27:					//esc
 		RequestSceneChange("menu");
+		break;
+	case 's':
+	case 'S':
+		// 빠른 상태 확인
+		DisplayStatus();
+		break;
 	}
 }
 
@@ -116,13 +225,20 @@ void MenuScene::Enter(std::unique_ptr<World>&)
 {
 	system("cls");
 	LoadText(menu, "menu.txt");
-	typewriter_print(menu, 20);
-	std::string menu[3]{ " 계속하기 ", " 저장하기 ", " 처음으로 " };
-	for (size_t i = 0; i < 3; i++)
-	{
-		if (option == i) std::cout << "            >";
-		else std::cout << "              ";
-		typewriter_print(menu[i], 20);
+
+	if (firstVisit) {
+		typewriter_print(menu, 20);
+		std::string menuItems[3]{ " 계속하기 ", " 저장하기 ", " 처음으로 " };
+		for (size_t i = 0; i < 3; i++)
+		{
+			if (option == i) std::cout << "            >";
+			else std::cout << "              ";
+			typewriter_print(menuItems[i], 20);
+		}
+		firstVisit = false;
+	}
+	else {
+		Display();
 	}
 }
 
@@ -236,7 +352,11 @@ void SaveScene::HandleInput(char input)
 {
 	switch (input) {
 	case 's':
-		if (saveAble) SaveWorld();
+		if (saveAble) {
+			SaveWorld();
+			system("cls");
+			Display();
+		}
 		break;
 	case 'l':
 		LoadWorld();
@@ -263,25 +383,30 @@ void SaveScene::LoadMeta()
 {
 	saveList.clear();
 	std::ifstream in{ "data/savefile", std::ios::binary };
-	if (not in) {
+	if (!in.is_open()) {
 		return;
 	}
-	while (in.peek() != EOF) {
+	while (in.good() && in.peek() != EOF) {
 		MetaData d;
 		in.read(reinterpret_cast<char*>(&d.slotNum), sizeof(d.slotNum));
+		if (!in.good()) break;
 		uint32_t nameLen;
 		in.read(reinterpret_cast<char*>(&nameLen), sizeof(nameLen));
+		if (!in.good() || nameLen > 1000) break;  // sanity check
 		d.worldName.resize(nameLen);
 		in.read(d.worldName.data(), nameLen);
+		if (!in.good()) break;
 		in.read(reinterpret_cast<char*>(&d.days), sizeof(d.days));
-		if (in) saveList.push_back(d);
+		if (in.good()) saveList.push_back(d);
 	}
+	in.close();
 }
 
 void SaveScene::SaveMeta()
 {
 	CreateDirectoryA("data", NULL);
-	std::ofstream out{ "data/savefile", std::ios::binary };
+	std::ofstream out{ "data/savefile", std::ios::binary | std::ios::trunc };
+	if (!out.is_open()) return;
 	for (auto& data : saveList) {
 		out.write(reinterpret_cast<const char*>(&data.slotNum), sizeof(data.slotNum));
 		uint32_t nameLen = static_cast<uint32_t>(data.worldName.size());
@@ -289,6 +414,7 @@ void SaveScene::SaveMeta()
 		out.write(data.worldName.data(), nameLen);
 		out.write(reinterpret_cast<const char*>(&data.days), sizeof(data.days));
 	}
+	out.close();
 }
 
 void SaveScene::LoadWorld()
@@ -494,4 +620,411 @@ void SaveScene::SaveWorld()
 	meta.worldName = fileName;
 	meta.days = world->GetCurrentDay();
 	saveList.push_back(meta);
+}
+
+
+// ========== GameScene 하루 시작 관련 함수 ==========
+void GameScene::InitDayMessages()
+{
+	// 첫 번째 줄: 하루 시작 인사
+	dayMessages["greeting"] = {
+		"오늘 하루가 시작됩니다.",
+		"새로운 하루가 밝았습니다.",
+		"또 하루가 시작되었습니다.",
+		"아침이 찾아왔습니다.",
+		"눈을 뜨니 또 하루입니다.",
+		"어둠이 걷히고 하루가 시작됩니다.",
+		"시민들이 잠에서 깨어납니다.",
+		"엔진 소리와 함께 하루가 열립니다.",
+		"강철 도시에 아침이 왔습니다.",
+		"살아있는 자들의 하루가 시작됩니다."
+	};
+
+	// 두 번째 줄: 바퀴/이동 관련
+	dayMessages["wheel"] = {
+		"바퀴는 멈추지 않습니다.",
+		"도시는 오늘도 굴러갑니다.",
+		"멈춤은 곧 죽음입니다.",
+		"우리는 계속 나아갑니다.",
+		"쉬는 것은 사치입니다.",
+		"엔진이 쉴 틈은 없습니다.",
+		"바퀴 소리가 오늘의 심장박동입니다.",
+		"도시의 맥박이 뛰고 있습니다.",
+		"움직임만이 생존입니다.",
+		"지평선을 향해 굴러갑니다.",
+		"먼지 폭풍 너머로 나아갑니다.",
+		"오늘도 죽음을 뒤로하고 달립니다.",
+		"살기 위해 멈출 수 없습니다.",
+		"정지는 선택지에 없습니다.",
+		"강철 심장은 쉬지 않습니다."
+	};
+}
+
+std::string GameScene::GetRandomMessage(const std::string& category)
+{
+	auto it = dayMessages.find(category);
+	if (it == dayMessages.end() || it->second.empty()) {
+		return "";
+	}
+
+	std::uniform_int_distribution<size_t> dist(0, it->second.size() - 1);
+	return it->second[dist(rng)];
+}
+
+std::string GameScene::GetMoodText(int mood)
+{
+	if (mood >= 8000) return "희망참";
+	if (mood >= 6000) return "평온함";
+	if (mood >= 4000) return "불안함";
+	if (mood >= 2000) return "침울함";
+	return "절망적";
+}
+
+void GameScene::DisplayDayStart()
+{
+	if (!world) return;
+
+	system("cls");
+
+	int month = world->GetMonth();
+	int dayOfMonth = world->GetDay();
+	int totalDay = world->GetCurrentDay();
+	int population = world->GetHumansSize();
+	const CityMetrics& cm = world->GetCity()->GetCityMet();
+
+	std::string moodText = GetMoodText(cm.mood);
+	std::string activityText = GetActivityText(cm.activity);
+	std::string scarcityText = GetScarcityText(cm.scarcity);
+
+	int avgStress = CalculateAverageStress();
+	int avgFatigue = CalculateAverageFatigue();
+
+	std::string greeting = GetRandomMessage("greeting");
+	std::string wheel = GetRandomMessage("wheel");
+
+	// 대시보드 스타일 출력 (std::print 사용)
+	std::println("");
+	std::println("  ╔════════════════════════════════════════════════╗");
+	std::println("  ║  2156년 {:>2}월 {:>2}일                      Day {:>3} ║", month, dayOfMonth, totalDay);
+	std::println("  ╠════════════════════════════════════════════════╣");
+	std::println("  ║  [도시 상태]             [시민 상태]           ║");
+	std::println("  ║  > 분위기: {:<8}     > 인구: {:>4}명         ║", moodText, population);
+	std::println("  ║  > 활동량: {:<8}     > 평균 스트레스: {:>3}%  ║", activityText, avgStress / 100);
+	std::println("  ║  > 결핍도: {:<8}     > 평균 피로도: {:>3}%    ║", scarcityText, avgFatigue / 100);
+	std::println("  ╠════════════════════════════════════════════════╣");
+	std::println("  ║  [오늘의 일지]                                 ║");
+	std::println("  ║  {:44}  ║", greeting);
+	std::println("  ║  {:44}  ║", wheel);
+	std::println("  ╚════════════════════════════════════════════════╝");
+	std::println("    [ESC] 메뉴  [S] 상세 상태");
+	std::println("");
+
+	// 저장된 대사들 다시 출력
+	for (const auto& dialogue : dayLog) {
+		std::println("    \"{}\"", dialogue);
+	}
+}
+
+void GameScene::DisplayEvent()
+{
+	if (!world) return;
+
+	EventManager* em = world->GetEventManager();
+	if (!em || !em->HasPendingPlayerEvent()) return;
+
+	const ActiveEvent* event = em->GetPendingPlayerEvent();
+	if (!event) return;
+
+	system("cls");
+
+	// 타자기 스타일 (옵션 C) - 이벤트 제목 강조
+	std::cout << std::endl;
+	std::cout << std::endl;
+	typewriter_print("  ...전방에서 이상 징후가 감지되었습니다.", 15);
+	std::cout << std::endl;
+	std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+	// 이벤트 제목 강조 (박스로 감싸기)
+	std::cout << "  ┌────────────────────────────────────────┐" << std::endl;
+	std::cout << "  │";
+	// 제목 중앙 정렬
+	int titleLen = event->name.length();
+	int padding = (40 - titleLen) / 2;
+	for (int i = 0; i < padding; ++i) std::cout << " ";
+	std::cout << ">> " << event->name << " <<";
+	for (int i = 0; i < 40 - padding - titleLen - 6; ++i) std::cout << " ";
+	std::cout << "│" << std::endl;
+	std::cout << "  └────────────────────────────────────────┘" << std::endl;
+
+	std::cout << std::endl;
+	typewriter_print("  " + event->description, 12);
+	std::cout << std::endl;
+	std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+	std::cout << std::endl;
+	typewriter_print("  어떻게 하시겠습니까?", 20);
+	std::cout << std::endl;
+
+	// 선택지 표시
+	for (size_t i = 0; i < event->choices.size(); ++i) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		if (i == 0) {
+			std::cout << "  > " << (i + 1) << ". " << event->choices[i].text << std::endl;
+		}
+		else {
+			std::cout << "    " << (i + 1) << ". " << event->choices[i].text << std::endl;
+		}
+	}
+
+	std::cout << std::endl;
+	std::cout << "  _" << std::endl;
+}
+
+void GameScene::DisplayStatus()
+{
+	if (!world) return;
+
+	const CityMetrics& cm = world->GetCity()->GetCityMet();
+	float accTime = world->GetAccumulatedTime();
+	float ratio = accTime / 480.0f;
+	std::string progressBar = GetProgressBar(ratio, 30);
+
+	int minutes = static_cast<int>(accTime / 60.0f);
+	int totalMinutes = 8;
+
+	// 고정 위치(17번째 줄)에 진행률 표시
+	gotoxy(0, 15);
+	std::print("  ╠════════════════════════════════════════════════╣\n");
+	std::print("  ║  [진행률] {} {:>3}%  ║\n", progressBar, static_cast<int>(ratio * 100));
+	std::print("  ║           {:>2}분 / {:>2}분                          ║\n", minutes, totalMinutes);
+	std::print("  ╚════════════════════════════════════════════════╝\n");
+}
+
+void GameScene::DisplayDayTransition()
+{
+	system("cls");
+	std::cout << std::endl;
+	std::cout << std::endl;
+	std::cout << std::endl;
+	std::cout << std::endl;
+	typewriter_print("                    ...", 100);
+	std::cout << std::endl;
+	typewriter_print("               다음 날이 밝았습니다.", 30);
+	std::cout << std::endl;
+	std::this_thread::sleep_for(std::chrono::milliseconds(800));
+}
+
+std::string GameScene::GetProgressBar(float ratio, int width)
+{
+	ratio = std::clamp(ratio, 0.0f, 1.0f);
+	int filled = static_cast<int>(ratio * width);
+	std::string bar;
+	for (int i = 0; i < filled; ++i) bar += "█";
+	for (int i = filled; i < width; ++i) bar += "░";
+	return bar;
+}
+
+int GameScene::CalculateAverageStress()
+{
+	if (!world || world->GetHumansSize() == 0) return 0;
+
+	int total = 0;
+	int count = world->GetHumansSize();
+	for (int i = 0; i < count; ++i) {
+		total += world->GetHumans(i)->GetStressLoad();
+	}
+	return total / count;
+}
+
+int GameScene::CalculateAverageFatigue()
+{
+	if (!world || world->GetHumansSize() == 0) return 0;
+
+	int total = 0;
+	int count = world->GetHumansSize();
+	for (int i = 0; i < count; ++i) {
+		total += world->GetHumans(i)->GetFatigue();
+	}
+	return total / count;
+}
+
+std::string GameScene::GetActivityText(int activity)
+{
+	if (activity >= 8000) return "매우 활발";
+	if (activity >= 6000) return "활발함";
+	if (activity >= 4000) return "보통";
+	if (activity >= 2000) return "침체";
+	return "정지 상태";
+}
+
+std::string GameScene::GetScarcityText(int scarcity)
+{
+	if (scarcity >= 8000) return "심각한 부족";
+	if (scarcity >= 6000) return "부족함";
+	if (scarcity >= 4000) return "보통";
+	if (scarcity >= 2000) return "여유";
+	return "풍족함";
+}
+
+void GameScene::LoadDialogueFiles()
+{
+	// 정신 상태별 대사 파일 로드
+	// ArousalState
+	dialogues["Calm"] = loadSentences("data/dialogues/Calm.txt");
+	dialogues["Tense"] = loadSentences("data/dialogues/Tense.txt");
+	dialogues["Irritable"] = loadSentences("data/dialogues/Irritable.txt");
+	dialogues["Hostile"] = loadSentences("data/dialogues/Hostile.txt");
+
+	// SocialState
+	dialogues["Neutral"] = loadSentences("data/dialogues/Neutral.txt");
+	dialogues["Cooperative"] = loadSentences("data/dialogues/Cooperative.txt");
+	dialogues["Withdrawn"] = loadSentences("data/dialogues/Withdrawn.txt");
+
+	// EnergyState
+	dialogues["Normal"] = loadSentences("data/dialogues/Normal.txt");
+	dialogues["Fatigued"] = loadSentences("data/dialogues/Fatigued.txt");
+	dialogues["Exhausted"] = loadSentences("data/dialogues/Exhausted.txt");
+
+	// ControlState
+	dialogues["Autonomous"] = loadSentences("data/dialogues/Autonomous.txt");
+	dialogues["Dependent"] = loadSentences("data/dialogues/Dependent.txt");
+	dialogues["Stubborn"] = loadSentences("data/dialogues/Stubborn.txt");
+
+	// 성향 기반
+	dialogues["Rationality"] = loadSentences("data/dialogues/Rationality.txt");
+	dialogues["Aggressiveness"] = loadSentences("data/dialogues/Aggressiveness.txt");
+	dialogues["Planning"] = loadSentences("data/dialogues/Planning.txt");
+	dialogues["Dependency"] = loadSentences("data/dialogues/Dependency.txt");
+	dialogues["Rigidity"] = loadSentences("data/dialogues/Rigidity.txt");
+	dialogues["Emotional Sensitivity"] = loadSentences("data/dialogues/Emotional Sensitivity.txt");
+
+	// 누적값 기반 (높음/낮음)
+	dialogues["High Stress"] = loadSentences("data/dialogues/High Stress.txt");
+	dialogues["Low Stress"] = loadSentences("data/dialogues/Low Stress.txt");
+	dialogues["High Fatigue"] = loadSentences("data/dialogues/High Fatigue.txt");
+	dialogues["Low Fatigue"] = loadSentences("data/dialogues/Low Fatigue.txt");
+	dialogues["High Motivation"] = loadSentences("data/dialogues/High Motivation.txt");
+	dialogues["Low Motivation"] = loadSentences("data/dialogues/Low Motivation.txt");
+	dialogues["High Arousal"] = loadSentences("data/dialogues/High Arousal.txt");
+	dialogues["Low Arousal"] = loadSentences("data/dialogues/Low Arousal.txt");
+	dialogues["High Cognitive"] = loadSentences("data/dialogues/High Cognitive.txt");
+	dialogues["Low Cognitive"] = loadSentences("data/dialogues/Low Cognitive.txt");
+	dialogues["High Trust"] = loadSentences("data/dialogues/High Trust.txt");
+	dialogues["Low Trust"] = loadSentences("data/dialogues/Low Trust.txt");
+	dialogues["High Safety"] = loadSentences("data/dialogues/High Safety.txt");
+	dialogues["Low Safety"] = loadSentences("data/dialogues/Low Safety.txt");
+	dialogues["High Control"] = loadSentences("data/dialogues/High Control.txt");
+	dialogues["Low Control"] = loadSentences("data/dialogues/Low Control.txt");
+}
+
+Human* GameScene::FindCitizenClosestToMood(int targetMood)
+{
+	if (!world || world->GetHumansSize() == 0) return nullptr;
+
+	Human* closest = nullptr;
+	int minDiff = INT_MAX;
+
+	int count = world->GetHumansSize();
+	for (int i = 0; i < count; ++i) {
+		Human* h = world->GetHumans(i);
+
+		// 시민의 개인 분위기 계산 (간략화)
+		int personalMood = 5000;
+		switch (h->GetArousal()) {
+		case ArousalState::Calm: personalMood += 1500; break;
+		case ArousalState::Tense: personalMood += 500; break;
+		case ArousalState::Irritable: personalMood -= 500; break;
+		case ArousalState::Hostile: personalMood -= 1500; break;
+		}
+		personalMood -= h->GetStressLoad() / 2;
+		personalMood += h->GetMotivation() / 2;
+
+		int diff = std::abs(personalMood - targetMood);
+		if (diff < minDiff) {
+			minDiff = diff;
+			closest = h;
+		}
+	}
+
+	return closest;
+}
+
+std::string GameScene::GetDialogueForState(const std::string& stateKey)
+{
+	auto it = dialogues.find(stateKey);
+	if (it == dialogues.end() || it->second.empty()) {
+		return "";
+	}
+
+	std::uniform_int_distribution<size_t> dist(0, it->second.size() - 1);
+	return it->second[dist(rng)];
+}
+
+void GameScene::DisplayCitizenDialogue()
+{
+	if (!world) return;
+
+	const CityMetrics& cm = world->GetCity()->GetCityMet();
+	Human* speaker = FindCitizenClosestToMood(cm.mood);
+	if (!speaker) return;
+
+	// 화자의 상태에 따른 대사 키 결정
+	std::string stateKey;
+
+	// 1순위: 가장 극단적인 정신상태 기준
+	ArousalState arousal = speaker->GetArousal();
+	if (arousal == ArousalState::Hostile) {
+		stateKey = "Hostile";
+	}
+	else if (arousal == ArousalState::Irritable) {
+		stateKey = "Irritable";
+	}
+	else if (arousal == ArousalState::Tense) {
+		stateKey = "Tense";
+	}
+	else {
+		// Calm일 때는 다른 상태 확인
+		EnergyState energy = speaker->GetEnergy();
+		if (energy == EnergyState::Exhausted) {
+			stateKey = "Exhausted";
+		}
+		else if (energy == EnergyState::Fatigued) {
+			stateKey = "Fatigued";
+		}
+		else {
+			// 누적값 기준
+			if (speaker->GetStressLoad() > 7000) {
+				stateKey = "High Stress";
+			}
+			else if (speaker->GetMotivation() > 7000) {
+				stateKey = "High Motivation";
+			}
+			else if (speaker->GetMotivation() < 3000) {
+				stateKey = "Low Motivation";
+			}
+			else {
+				// 사회적 상태
+				SocialState social = speaker->GetSocial();
+				if (social == SocialState::Cooperative) {
+					stateKey = "Cooperative";
+				}
+				else if (social == SocialState::Withdrawn) {
+					stateKey = "Withdrawn";
+				}
+				else {
+					stateKey = "Neutral";
+				}
+			}
+		}
+	}
+
+	std::string dialogue = GetDialogueForState(stateKey);
+	if (dialogue.empty()) {
+		// 기본 대사
+		dialogue = "...";
+	}
+
+	// 대사 저장 및 출력
+	dayLog.push_back(dialogue);
+	std::println("    \"{}\"", dialogue);
 }

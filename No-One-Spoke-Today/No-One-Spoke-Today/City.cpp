@@ -83,10 +83,17 @@ City::City(const std::vector<std::unique_ptr<Human>>& humans)
         scarcitySum += scarcity;
     }
 
-    int n = humans.size();
-    cityMet.mood = moodSum / n;
-    cityMet.activity = activitySum / n;
-    cityMet.scarcity = scarcitySum / n;
+    size_t n = humans.size();
+    if (n > 0) {
+        cityMet.mood = moodSum / static_cast<int>(n);
+        cityMet.activity = activitySum / static_cast<int>(n);
+        cityMet.scarcity = scarcitySum / static_cast<int>(n);
+    }
+    else {
+        cityMet.mood = 5000;
+        cityMet.activity = 5000;
+        cityMet.scarcity = 5000;
+    }
 
 
 }
@@ -176,10 +183,12 @@ void City::Update(const std::vector<std::unique_ptr<Human>>& humans)
         scarcitySum += scarcity;
     }
 
-    int n = humans.size();
-    cityMet.mood = moodSum / n;
-    cityMet.activity = activitySum / n;
-    cityMet.scarcity = scarcitySum / n;
+    size_t n = humans.size();
+    if (n > 0) {
+        cityMet.mood = moodSum / static_cast<int>(n);
+        cityMet.activity = activitySum / static_cast<int>(n);
+        cityMet.scarcity = scarcitySum / static_cast<int>(n);
+    }
 }
 
 void City::Debug() const

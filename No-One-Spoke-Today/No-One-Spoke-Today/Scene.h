@@ -30,7 +30,7 @@ private:
 	std::string nextSceneName;
 };
 
-class TitleScene : public Scene 
+class TitleScene : public Scene
 {
 public:
 
@@ -45,6 +45,7 @@ private:
 	std::string title;
 	std::string intro;
 	int option{};
+	bool firstVisit{ true };
 };
 
 class GameScene : public Scene
@@ -59,13 +60,40 @@ public:
 	void sHandleInput(char);
 
 private:
+	void DisplayDayStart();
+	void DisplayEvent();
+	void DisplayStatus();
+	void DisplayDayTransition();
+	void DisplayCitizenDialogue();
+	void InitDayMessages();
+	void LoadDialogueFiles();
+	std::string GetRandomMessage(const std::string& category);
+	std::string GetMoodText(int mood);
+	std::string GetActivityText(int activity);
+	std::string GetScarcityText(int scarcity);
+	std::string GetProgressBar(float ratio, int width = 20);
+	std::string GetDialogueForState(const std::string& stateKey);
+	int CalculateAverageStress();
+	int CalculateAverageFatigue();
+	Human* FindCitizenClosestToMood(int targetMood);
+
 	World* world{ nullptr };
 
 	std::vector<std::string> dayLog;
-	std::unordered_map<std::string, std::vector<std::string>> sentences;
+	std::unordered_map<std::string, std::vector<std::string>> dayMessages;
+	std::unordered_map<std::string, std::vector<std::string>> dialogues;  // 상태별 대사
 	int lastDay{ -1 };
 	bool waitingForChoice{ false };
-	float sentenceTimer{ 0.f };
+	bool eventDisplayed{ false };
+	float statusUpdateTimer{ 0.f };
+	float dialogueTimer{ 0.f };
+	static constexpr float STATUS_UPDATE_INTERVAL = 3.0f;
+	static constexpr float DIALOGUE_INTERVAL = 5.0f;
+	bool dayStartDisplayed{ false };
+	bool dayTransitionShown{ false };
+	bool firstVisit{ true };
+	bool dialoguesLoaded{ false };
+	std::default_random_engine rng{ std::random_device{}() };
 };
 
 class MenuScene : public Scene
@@ -82,6 +110,7 @@ public:
 private:
 	std::string menu;
 	int option{};
+	bool firstVisit{ true };
 };
 
 class SaveScene : public Scene

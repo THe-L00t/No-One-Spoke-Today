@@ -13,6 +13,9 @@ World::World()
 	}
 	city = std::make_unique<City>(humans);
 	eventManager = std::make_unique<EventManager>();
+
+	// 이벤트 파일 로드
+	eventManager->LoadEventDefsFromText("data/events.txt");
 }
 
 void World::Update(float deltaTime)
@@ -24,11 +27,21 @@ void World::Update(float deltaTime)
 	}
 	city->Update(humans);
 
+	// 시간 경과에 따른 이벤트 발동 체크
+	float dayRatio = accumulatedTime / dayDuration;
+	eventManager->UpdateTime(dayRatio, *city, humans);
+
 	// 하루 전환 시 이벤트 처리
 	accumulatedTime += deltaTime;
 	if (accumulatedTime >= dayDuration) {
 		accumulatedTime -= dayDuration;
 		currentDay++;
+		day++;
+		// 월 전환 처리 (간단히 30일 기준)
+		if (day > 30) {
+			day = 1;
+			month++;
+		}
 		eventManager->ProcessDailyEvents(*city, city->GetCityMet(), humans, currentDay);
 	}
 }
@@ -51,6 +64,11 @@ Human* World::GetHumans(int idx)
 int World::GetHumansSize() const
 {
 	return humans.size();
+}
+
+std::vector<std::unique_ptr<Human>>& World::GetHumansVector()
+{
+	return humans;
 }
 
 

@@ -27,6 +27,9 @@ void Framework::Loop()
     currentScene = scenes["start"].get();
     currentScene->Enter(world);
     while (true) {
+        // 시간 업데이트 (deltaTime 계산)
+        timer->Update();
+
         if (_kbhit()) {
             int input = _getch();
             if (input == 0 || input == 224) { // 방향키 또는 기능키
@@ -38,7 +41,6 @@ void Framework::Loop()
             }
         }
         currentScene->Update(timer->deltaTime);
-        //currentScene->Display();
 
         // 씬 전환 체크
         if (currentScene->IsSceneChangeRequested()) {
@@ -47,6 +49,9 @@ void Framework::Loop()
             currentScene = scenes[nextSceneName].get();
             currentScene->Enter(world);
         }
+
+        // CPU 과부하 방지를 위한 짧은 sleep
+        std::this_thread::sleep_for(std::chrono::milliseconds(16)); // ~60 FPS
     }
 }
 
