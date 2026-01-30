@@ -34,6 +34,9 @@
     <Filter Include="소스 파일\World">
       <UniqueIdentifier>{f6a518ac-d48f-4251-becd-f1ac4a7f4058}</UniqueIdentifier>
     </Filter>
+    <Filter Include="리소스 파일\dialogue">
+      <UniqueIdentifier>{2bdf8400-5dbe-4c76-b092-6d55c406d128}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -59,6 +62,9 @@
     </ClCompile>
     <ClCompile Include="World.cpp">
       <Filter>소스 파일\World</Filter>
+    </ClCompile>
+    <ClCompile Include="Event.cpp">
+      <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -89,6 +95,9 @@
     <ClInclude Include="data.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="Event.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="intro.txt">
@@ -99,6 +108,114 @@
     </Text>
     <Text Include="titleASCIIart.txt">
       <Filter>리소스 파일</Filter>
+    </Text>
+    <Text Include="Withdrawn.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="Aggressiveness.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="Autonomous.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="Calm.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="Cooperative.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="Dependency.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="Dependent.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="Emotional Sensitivity.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="Exhausted.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="Fatigued.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="High Arousal.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="High Cognitive.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="High Control.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="High Fatigue.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="High Motivation.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="High Safety.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="High Stress.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="High Trust.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="Hostile.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="Irritable.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="Low Arousal.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="Low Cognitive.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="Low Control.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="Low Fatigue.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="Low Motivation.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="Low Safety.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="Low Stress.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="Low Trust.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="menu.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="Neutral.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="Normal.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="Planning.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="Rationality.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="Rigidity.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="Stubborn.txt">
+      <Filter>리소스 파일\dialogue</Filter>
+    </Text>
+    <Text Include="Tense.txt">
+      <Filter>리소스 파일\dialogue</Filter>
     </Text>
   </ItemGroup>
 </Project>
