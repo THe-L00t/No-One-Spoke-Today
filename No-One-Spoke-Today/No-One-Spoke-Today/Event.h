@@ -344,7 +344,8 @@ private:
 	std::deque<ActiveEvent> scheduledEvents;	// 오늘 발생 예정
 	std::deque<ActiveEvent> pendingPlayerEvents;
 	std::unordered_map<std::string, int> lastFiredDay;
-	int maxEventsPerDay{ 2 };
+	int minEventsPerDay{ 2 };
+	int maxEventsPerDay{ 6 };
 
 	std::unordered_map<std::string, CustomEffectFunc> customEffectRegistry;
 

@@ -755,8 +755,8 @@ void GameScene::DisplayDayStart()
 	std::println("  ╠════════════════════════════════════════════════╣");
 	std::println("  ║  [도시 상태]             [시민 상태]           ║");
 	std::println("  ║  > 분위기: {:<8}     > 인구: {:>4}명         ║", moodText, population);
-	std::println("  ║  > 활동량: {:<10}   > 평균 스트레스: {:>3}%  ║", activityText, avgStress / 100);
-	std::println("  ║  > 결핍도: {:<8}     > 평균 피로도: {:>3}%    ║", scarcityText, avgFatigue / 100);
+	std::println("  ║  > 활동량: {:<12} > 평균 스트레스: {:>3}%  ║", activityText, avgStress / 100);
+	std::println("  ║  > 결핍도: {:<12} > 평균 피로도: {:>3}%    ║", scarcityText, avgFatigue / 100);
 	std::println("  ╠════════════════════════════════════════════════╣");
 	std::println("  ║  [오늘의 일지]                                 ║");
 	std::println("  ║  {:44}  ║", currentGreeting);

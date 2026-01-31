@@ -623,10 +623,14 @@ void EventManager::ProcessDailyEvents(
 		candidates.push_back(&def);
 	}
 
-	// 후보 중 랜덤 선택 (최대 maxEventsPerDay개)
+	// 후보 중 랜덤 선택 (minEventsPerDay ~ maxEventsPerDay개)
 	std::shuffle(candidates.begin(), candidates.end(), rng);
 
-	int eventCount = (std::min)(maxEventsPerDay, static_cast<int>(candidates.size()));
+	int candidateCount = static_cast<int>(candidates.size());
+	int targetMin = (std::min)(minEventsPerDay, candidateCount);
+	int targetMax = (std::min)(maxEventsPerDay, candidateCount);
+	std::uniform_int_distribution<int> eventCountDist(targetMin, targetMax);
+	int eventCount = eventCountDist(rng);
 	for (int i = 0; i < eventCount; ++i) {
 		const EventDef* def = candidates[i];
 		ActiveEvent event = ActivateEvent(*def, cityCode, humans);
