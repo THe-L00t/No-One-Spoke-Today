@@ -779,20 +779,39 @@ void GameScene::DisplayEvent()
 	const ActiveEvent* event = em->GetPendingPlayerEvent();
 	if (!event) return;
 
+	// 화면 갱신: 대시보드 + 대사들 + 이벤트 순서로 출력
 	system("cls");
 
-	// 타자기 스타일 (옵션 C) - 이벤트 제목 강조
+	// 대시보드 (간소화 버전)
+	int month = world->GetMonth();
+	int dayOfMonth = world->GetDay();
+	int totalDay = world->GetCurrentDay();
+	int population = world->GetHumansSize();
+	const CityMetrics& cm = world->GetCity()->GetCityMet();
+
+	std::string moodText = GetMoodText(cm.mood);
+	int avgStress = CalculateAverageStress();
+
+	std::println("");
+	std::println("  ╔════════════════════════════════════════════════╗");
+	std::println("  ║  2156년 {:>2}월 {:>2}일                      Day {:>3} ║", month, dayOfMonth, totalDay + 1);
+	std::println("  ║  분위기: {:<8}  인구: {:>4}명  스트레스: {:>3}% ║", moodText, population, avgStress / 100);
+	std::println("  ╚════════════════════════════════════════════════╝");
+
+	// 저장된 대사들 출력
+	for (const auto& d : dayLog) {
+		std::println("    \"{}\"", d);
+	}
+
+	// 이벤트 구분선
 	std::cout << std::endl;
+	std::println("  ──────────────── [이벤트 발생] ────────────────");
 	std::cout << std::endl;
-	typewriter_print("  ...전방에서 이상 징후가 감지되었습니다.", 15);
-	std::cout << std::endl;
-	std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
 	// 이벤트 제목 강조 (박스로 감싸기)
 	std::cout << "  ┌────────────────────────────────────────┐" << std::endl;
 	std::cout << "  │";
-	// 제목 중앙 정렬
-	int titleLen = event->name.length();
+	int titleLen = static_cast<int>(event->name.length());
 	int padding = (40 - titleLen) / 2;
 	for (int i = 0; i < padding; ++i) std::cout << " ";
 	std::cout << ">> " << event->name << " <<";
@@ -801,17 +820,14 @@ void GameScene::DisplayEvent()
 	std::cout << "  └────────────────────────────────────────┘" << std::endl;
 
 	std::cout << std::endl;
-	typewriter_print("  " + event->description, 12);  
+	std::cout << "  " << event->description << std::endl;
 	std::cout << std::endl;
-	std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
-	std::cout << std::endl;
-	typewriter_print("  어떻게 하시겠습니까?", 20);
+	std::cout << "  어떻게 하시겠습니까?" << std::endl;
 	std::cout << std::endl;
 
 	// 선택지 표시
 	for (size_t i = 0; i < event->choices.size(); ++i) {
-		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		if (i == 0) {
 			std::cout << "  > " << (i + 1) << ". " << event->choices[i].text << std::endl;
 		}

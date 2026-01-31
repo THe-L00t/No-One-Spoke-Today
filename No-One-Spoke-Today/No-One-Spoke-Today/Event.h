@@ -347,6 +347,11 @@ private:
 	int minEventsPerDay{ 2 };
 	int maxEventsPerDay{ 6 };
 
+	// 하루 이벤트 진행 상태 (저장/로드용)
+	int lastProcessedDay{ -1 };		// 마지막으로 이벤트 처리한 날
+	int targetEventsToday{ 0 };		// 오늘 목표 이벤트 수
+	int eventsTriggeredToday{ 0 };	// 오늘 이미 발생한 이벤트 수
+
 	std::unordered_map<std::string, CustomEffectFunc> customEffectRegistry;
 
 	std::default_random_engine rng;

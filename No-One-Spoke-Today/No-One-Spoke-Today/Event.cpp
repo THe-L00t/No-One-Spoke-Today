@@ -591,6 +591,16 @@ void EventManager::ProcessDailyEvents(
 {
 	scheduledEvents.clear();
 
+	// 새로운 날인지 확인
+	bool isNewDay = (lastProcessedDay != currentDay);
+
+	if (isNewDay) {
+		// 새로운 날: 카운터 리셋
+		lastProcessedDay = currentDay;
+		eventsTriggeredToday = 0;
+		targetEventsToday = 0;  // 아래에서 새로 결정
+	}
+
 	CityCode cityCode = EncodeCityState(metrics);
 
 	std::vector<const EventDef*> candidates;
@@ -623,14 +633,27 @@ void EventManager::ProcessDailyEvents(
 		candidates.push_back(&def);
 	}
 
-	// 후보 중 랜덤 선택 (minEventsPerDay ~ maxEventsPerDay개)
+	// 후보 중 랜덤 선택
 	std::shuffle(candidates.begin(), candidates.end(), rng);
 
 	int candidateCount = static_cast<int>(candidates.size());
-	int targetMin = (std::min)(minEventsPerDay, candidateCount);
-	int targetMax = (std::min)(maxEventsPerDay, candidateCount);
-	std::uniform_int_distribution<int> eventCountDist(targetMin, targetMax);
-	int eventCount = eventCountDist(rng);
+	int eventCount = 0;
+
+	if (isNewDay) {
+		// 새로운 날: 목표 이벤트 수 결정 (minEventsPerDay ~ maxEventsPerDay)
+		int targetMin = (std::min)(minEventsPerDay, candidateCount);
+		int targetMax = (std::min)(maxEventsPerDay, candidateCount);
+		std::uniform_int_distribution<int> eventCountDist(targetMin, targetMax);
+		targetEventsToday = eventCountDist(rng);
+		eventCount = targetEventsToday;
+	}
+	else {
+		// 같은 날 (로드 후): 남은 이벤트 수만 스케줄링
+		int remainingEvents = targetEventsToday - eventsTriggeredToday;
+		eventCount = (std::min)(remainingEvents, candidateCount);
+		if (eventCount < 0) eventCount = 0;
+	}
+
 	for (int i = 0; i < eventCount; ++i) {
 		const EventDef* def = candidates[i];
 		ActiveEvent event = ActivateEvent(*def, cityCode, humans);
@@ -673,6 +696,9 @@ void EventManager::TriggerEvent(
 		}
 	}
 	if (!def) return;
+
+	// 이벤트 발생 카운터 증가
+	eventsTriggeredToday++;
 
 	if (event.requiresPlayer) {
 		pendingPlayerEvents.push_back(event);
@@ -814,12 +840,18 @@ void EventManager::ApplyPlayerChoice(
 
 // ========== 게임 상태 저장/로드 ==========
 void EventManager::SaveState(std::ofstream& out) const {
+	// 쿨다운 정보 저장
 	uint32_t cooldownCount = static_cast<uint32_t>(lastFiredDay.size());
 	out.write(reinterpret_cast<const char*>(&cooldownCount), sizeof(cooldownCount));
 	for (const auto& pair : lastFiredDay) {
 		WriteString(out, pair.first);
 		out.write(reinterpret_cast<const char*>(&pair.second), sizeof(pair.second));
 	}
+
+	// 하루 이벤트 진행 상태 저장
+	out.write(reinterpret_cast<const char*>(&lastProcessedDay), sizeof(lastProcessedDay));
+	out.write(reinterpret_cast<const char*>(&targetEventsToday), sizeof(targetEventsToday));
+	out.write(reinterpret_cast<const char*>(&eventsTriggeredToday), sizeof(eventsTriggeredToday));
 }
 
 void EventManager::LoadState(std::ifstream& in) {
@@ -827,6 +859,7 @@ void EventManager::LoadState(std::ifstream& in) {
 	scheduledEvents.clear();
 	pendingPlayerEvents.clear();
 
+	// 쿨다운 정보 로드
 	uint32_t cooldownCount = 0;
 	in.read(reinterpret_cast<char*>(&cooldownCount), sizeof(cooldownCount));
 	for (uint32_t i = 0; i < cooldownCount; ++i) {
@@ -835,6 +868,11 @@ void EventManager::LoadState(std::ifstream& in) {
 		in.read(reinterpret_cast<char*>(&day), sizeof(day));
 		lastFiredDay[id] = day;
 	}
+
+	// 하루 이벤트 진행 상태 로드
+	in.read(reinterpret_cast<char*>(&lastProcessedDay), sizeof(lastProcessedDay));
+	in.read(reinterpret_cast<char*>(&targetEventsToday), sizeof(targetEventsToday));
+	in.read(reinterpret_cast<char*>(&eventsTriggeredToday), sizeof(eventsTriggeredToday));
 }
 
 
