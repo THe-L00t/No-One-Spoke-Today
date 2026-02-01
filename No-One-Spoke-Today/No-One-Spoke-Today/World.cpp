@@ -16,23 +16,17 @@ World::World()
 
 	// 이벤트 파일 로드
 	eventManager->LoadEventDefsFromText("data/events.txt");
+
+	// 첫날 이벤트 스케줄링
+	eventManager->ProcessDailyEvents(*city, city->GetCityMet(), humans, currentDay);
 }
 
 void World::Update(float deltaTime)
 {
-	CityMetrics cm{city->GetCityMet()};
-	for (auto& h : humans) {
-		h->UpdateDrive(deltaTime, cm);
-		h->UpdateMentalState();
-	}
-	city->Update(humans);
-
-	// 시간 경과에 따른 이벤트 발동 체크
-	float dayRatio = accumulatedTime / dayDuration;
-	eventManager->UpdateTime(dayRatio, *city, humans);
-
-	// 하루 전환 시 이벤트 처리
+	// 시간 누적
 	accumulatedTime += deltaTime;
+
+	// 하루 전환 시 새로운 날 이벤트 스케줄링
 	if (accumulatedTime >= dayDuration) {
 		accumulatedTime -= dayDuration;
 		currentDay++;
@@ -44,6 +38,18 @@ void World::Update(float deltaTime)
 		}
 		eventManager->ProcessDailyEvents(*city, city->GetCityMet(), humans, currentDay);
 	}
+
+	// 시간 경과에 따른 이벤트 발동 체크
+	float dayRatio = accumulatedTime / dayDuration;
+	eventManager->UpdateTime(dayRatio, *city, humans);
+
+	// 인간/도시 업데이트
+	CityMetrics cm{city->GetCityMet()};
+	for (auto& h : humans) {
+		h->UpdateDrive(deltaTime, cm);
+		h->UpdateMentalState();
+	}
+	city->Update(humans);
 }
 
 EventManager* World::GetEventManager()

@@ -578,10 +578,33 @@ void SaveScene::SaveWorld()
 {
 	if (!saveAble || !world) return;
 
+	// 기존 슬롯에 덮어쓰기인지 확인
+	bool isOverwrite = !foundSave[option].worldName.empty() && foundSave[option].worldName != "비어있음";
+	int existingSlotIndex = -1;
+
+	if (isOverwrite) {
+		// saveList에서 해당 슬롯 찾기
+		for (size_t i = 0; i < saveList.size(); ++i) {
+			if (saveList[i].slotNum == foundSave[option].slotNum) {
+				existingSlotIndex = static_cast<int>(i);
+				break;
+			}
+		}
+	}
+
 	std::string fileName;
 	std::cout << "저장할 이름을 작성해주세요 : ";
 	std::cin >> fileName;
 	CreateDirectoryA("data", NULL);
+
+	// 덮어쓰기인 경우 기존 파일 삭제
+	if (isOverwrite && existingSlotIndex >= 0) {
+		std::string oldFileName = saveList[existingSlotIndex].worldName;
+		if (oldFileName != fileName) {
+			std::remove(("data/" + oldFileName + ".bin").c_str());
+		}
+	}
+
 	std::ofstream out{ "data/" + fileName + ".bin", std::ios::binary };
 	if (not out) return;
 
@@ -660,11 +683,22 @@ void SaveScene::SaveWorld()
 	std::cout << "저장 완료: data/" << fileName << ".bin" << std::endl;
 
 	// 메타데이터 업데이트
-	MetaData meta;
-	meta.slotNum = static_cast<unsigned short>(saveList.size() + 1);
-	meta.worldName = fileName;
-	meta.days = world->GetCurrentDay();
-	saveList.push_back(meta);
+	if (isOverwrite && existingSlotIndex >= 0) {
+		// 기존 슬롯 업데이트
+		saveList[existingSlotIndex].worldName = fileName;
+		saveList[existingSlotIndex].days = world->GetCurrentDay();
+	}
+	else {
+		// 새 슬롯 추가
+		MetaData meta;
+		meta.slotNum = static_cast<unsigned short>(saveList.size() + 1);
+		meta.worldName = fileName;
+		meta.days = world->GetCurrentDay();
+		saveList.push_back(meta);
+	}
+
+	// 화면에 표시되는 foundSave도 업데이트
+	Update(0);
 }
 
 
