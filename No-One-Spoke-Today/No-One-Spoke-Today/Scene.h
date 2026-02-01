@@ -61,6 +61,7 @@ public:
 
 private:
 	void DisplayDayStart();
+	void DisplayDayEnd();
 	void DisplayEvent();
 	void DisplayStatus();
 	void DisplayDayTransition();

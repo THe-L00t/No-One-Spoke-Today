@@ -115,7 +115,7 @@ void GameScene::Update(float deltaTime)
 	if (today != lastDay) {
 		// 하루 전환 연출
 		if (lastDay >= 0 && !dayTransitionShown) {
-			DisplayDayTransition();
+			DisplayDayEnd();  // 하루 엔딩 문구 후 바로 다음 날 시작
 			dayTransitionShown = true;
 		}
 		lastDay = today;
@@ -201,7 +201,12 @@ void GameScene::HandleInput(char input)
 
 			if (choiceIndex >= 0 && choiceIndex < static_cast<int>(event->choices.size())) {
 				// 선택한 텍스트 저장 (ApplyPlayerChoice 후 event가 사라지므로)
+				std::string eventName = event->name;
 				std::string chosenText = event->choices[choiceIndex].text;
+
+				// 이벤트 기록을 dayLog에 추가
+				std::string eventLog = "[" + eventName + "] → " + chosenText;
+				dayLog.push_back(eventLog);
 
 				// 선택 적용
 				em->ApplyPlayerChoice(choiceIndex, *world->GetCity(), world->GetHumansVector());
@@ -211,10 +216,15 @@ void GameScene::HandleInput(char input)
 				system("cls");
 				DisplayDayStart();
 
+				// 저장된 대사들 다시 출력
+				for (const auto& d : dayLog) {
+					std::println("    \"{}\"", d);
+				}
+
 				// 선택 결과 표시
-				std::cout << std::endl;
-				std::cout << "    >> 선택 완료: " << chosenText << std::endl;
-				std::cout << std::endl;
+				std::println("");
+				std::println("    >> 선택 완료: {}", chosenText);
+				std::println("");
 				return;
 			}
 		}
@@ -785,7 +795,7 @@ void GameScene::DisplayDayStart()
 	// 대시보드 스타일 출력 (std::print 사용)
 	std::println("");
 	std::println("  ╔════════════════════════════════════════════════╗");
-	std::println("  ║  2156년 {:>2}월 {:>2}일                      Day {:>3} ║", month, dayOfMonth, totalDay+1);
+	std::println("  ║  2156년 {:>2}월 {:>2}일                      Day {:>3} ║", month, dayOfMonth, totalDay);
 	std::println("  ╠════════════════════════════════════════════════╣");
 	std::println("  ║  [도시 상태]             [시민 상태]           ║");
 	std::println("  ║  > 분위기: {:<8}     > 인구: {:>4}명         ║", moodText, population);
@@ -828,7 +838,7 @@ void GameScene::DisplayEvent()
 
 	std::println("");
 	std::println("  ╔════════════════════════════════════════════════╗");
-	std::println("  ║  2156년 {:>2}월 {:>2}일                      Day {:>3} ║", month, dayOfMonth, totalDay + 1);
+	std::println("  ║  2156년 {:>2}월 {:>2}일                      Day {:>3} ║", month, dayOfMonth, totalDay );
 	std::println("  ║  분위기: {:<8}  인구: {:>4}명  스트레스: {:>3}% ║", moodText, population, avgStress / 100);
 	std::println("  ╚════════════════════════════════════════════════╝");
 
@@ -838,40 +848,34 @@ void GameScene::DisplayEvent()
 	}
 
 	// 이벤트 구분선
-	std::cout << std::endl;
+	std::println("");
 	std::println("  ──────────────── [이벤트 발생] ────────────────");
-	std::cout << std::endl;
+	std::println("");
 
 	// 이벤트 제목 강조 (박스로 감싸기)
-	std::cout << "  ┌────────────────────────────────────────┐" << std::endl;
-	std::cout << "  │";
-	int titleLen = static_cast<int>(event->name.length());
-	int padding = (40 - titleLen) / 2;
-	for (int i = 0; i < padding; ++i) std::cout << " ";
-	std::cout << ">> " << event->name << " <<";
-	for (int i = 0; i < 40 - padding - titleLen - 6; ++i) std::cout << " ";
-	std::cout << "│" << std::endl;
-	std::cout << "  └────────────────────────────────────────┘" << std::endl;
+	std::println("  ┌────────────────────────────────────────┐");
+	std::println("  │{:^40}│", ">> " + event->name + " <<");
+	std::println("  └────────────────────────────────────────┘");
 
-	std::cout << std::endl;
-	std::cout << "  " << event->description << std::endl;
-	std::cout << std::endl;
+	std::println("");
+	std::println("  {}", event->description);
+	std::println("");
 
-	std::cout << "  어떻게 하시겠습니까?" << std::endl;
-	std::cout << std::endl;
+	std::println("  어떻게 하시겠습니까?");
+	std::println("");
 
 	// 선택지 표시
 	for (size_t i = 0; i < event->choices.size(); ++i) {
 		if (i == 0) {
-			std::cout << "  > " << (i + 1) << ". " << event->choices[i].text << std::endl;
+			std::println("  > {}. {}", i + 1, event->choices[i].text);
 		}
 		else {
-			std::cout << "    " << (i + 1) << ". " << event->choices[i].text << std::endl;
+			std::println("    {}. {}", i + 1, event->choices[i].text);
 		}
 	}
 
-	std::cout << std::endl;
-	std::cout << "  _" << std::endl;
+	std::println("");
+	std::println("  _");
 }
 
 void GameScene::DisplayStatus()
@@ -901,12 +905,12 @@ void GameScene::DisplayStatus()
 
 	std::println("");
 	std::println("  ╔════════════════════════════════════════════════╗");
-	std::println("  ║  2156년 {:>2}월 {:>2}일                      Day {:>3} ║", month, dayOfMonth, totalDay+1);
+	std::println("  ║  2156년 {:>2}월 {:>2}일                      Day {:>3} ║", month, dayOfMonth, totalDay);
 	std::println("  ╠════════════════════════════════════════════════╣");
 	std::println("  ║  [도시 상태]             [시민 상태]           ║");
 	std::println("  ║  > 분위기: {:<8}     > 인구: {:>4}명         ║", moodText, population);
-	std::println("  ║  > 활동량: {:<10}   > 평균 스트레스: {:>3}%  ║", activityText, avgStress / 100);
-	std::println("  ║  > 결핍도: {:<8}     > 평균 피로도: {:>3}%    ║", scarcityText, avgFatigue / 100);
+	std::println("  ║  > 활동량: {:<12} > 평균 스트레스: {:>3}%  ║", activityText, avgStress / 100);
+	std::println("  ║  > 결핍도: {:<12} > 평균 피로도: {:>3}%    ║", scarcityText, avgFatigue / 100);
 	std::println("  ╠════════════════════════════════════════════════╣");
 	std::println("  ║  [오늘의 일지]                                 ║");
 	std::println("  ║  {:44}  ║", currentGreeting);
@@ -924,17 +928,64 @@ void GameScene::DisplayStatus()
 	}
 }
 
+void GameScene::DisplayDayEnd()
+{
+	if (!world) return;
+
+	const CityMetrics& cm = world->GetCity()->GetCityMet();
+	int avgStress = CalculateAverageStress();
+	int avgFatigue = CalculateAverageFatigue();
+
+	// 상태에 따른 엔딩 문구 카테고리 결정
+	std::string category;
+
+	// 우선순위: 결핍 > 피로 > 스트레스 > 분위기
+	if (cm.scarcity >= 6000) {
+		category = "ending_scarce";
+	}
+	else if (avgFatigue >= 6000) {
+		category = "ending_exhausted";
+	}
+	else if (avgStress >= 6000) {
+		category = "ending_stressed";
+	}
+	else if (cm.mood >= 6000) {
+		category = "ending_good_mood";
+	}
+	else if (cm.mood >= 4000) {
+		category = "ending_normal_mood";
+	}
+	else {
+		category = "ending_bad_mood";
+	}
+
+	std::string endingMessage = GetDialogueForState(category);
+	if (endingMessage.empty()) {
+		endingMessage = "오늘 하루도 살아남았습니다.";
+	}
+
+	system("cls");
+	std::println("");
+	std::println("");
+	std::println("");
+	std::println("");
+	std::println("                    {}", endingMessage);
+	std::println("");
+
+	std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+}
+
 void GameScene::DisplayDayTransition()
 {
 	system("cls");
-	std::cout << std::endl;
-	std::cout << std::endl;
-	std::cout << std::endl;
-	std::cout << std::endl;
+	std::println("");
+	std::println("");
+	std::println("");
+	std::println("");
 	typewriter_print("                    ...", 100);
-	std::cout << std::endl;
+	std::println("");
 	typewriter_print("               다음 날이 밝았습니다.", 30);
-	std::cout << std::endl;
+	std::println("");
 	std::this_thread::sleep_for(std::chrono::milliseconds(800));
 }
 
@@ -1039,6 +1090,14 @@ void GameScene::LoadDialogueFiles()
 	dialogues["Low Safety"] = loadSentences("data/dialogues/Low Safety.txt");
 	dialogues["High Control"] = loadSentences("data/dialogues/High Control.txt");
 	dialogues["Low Control"] = loadSentences("data/dialogues/Low Control.txt");
+
+	// 하루 엔딩 문구
+	dialogues["ending_good_mood"] = loadSentences("data/dialogues/ending_good_mood.txt");
+	dialogues["ending_normal_mood"] = loadSentences("data/dialogues/ending_normal_mood.txt");
+	dialogues["ending_bad_mood"] = loadSentences("data/dialogues/ending_bad_mood.txt");
+	dialogues["ending_scarce"] = loadSentences("data/dialogues/ending_scarce.txt");
+	dialogues["ending_exhausted"] = loadSentences("data/dialogues/ending_exhausted.txt");
+	dialogues["ending_stressed"] = loadSentences("data/dialogues/ending_stressed.txt");
 }
 
 std::vector<std::string> GameScene::GetMatchingDialogueKeys(Human* h)

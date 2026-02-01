@@ -5,6 +5,13 @@
 #include <algorithm>
 #include <cctype>
 
+// 디버그 로그를 파일로 출력
+static std::ofstream& GetDebugLog() {
+	static std::ofstream debugLog("data/debug.log", std::ios::trunc);
+	return debugLog;
+}
+#define EVENT_LOG(msg) { GetDebugLog() << msg << std::endl; GetDebugLog().flush(); }
+
 
 // ========== 유틸리티 함수 ==========
 namespace {
@@ -591,6 +598,9 @@ void EventManager::ProcessDailyEvents(
 {
 	scheduledEvents.clear();
 
+	EVENT_LOG("[EVENT] ProcessDailyEvents called, Day=" << currentDay
+			  << ", definitions=" << definitions.size());
+
 	// 새로운 날인지 확인
 	bool isNewDay = (lastProcessedDay != currentDay);
 
@@ -599,6 +609,7 @@ void EventManager::ProcessDailyEvents(
 		lastProcessedDay = currentDay;
 		eventsTriggeredToday = 0;
 		targetEventsToday = 0;  // 아래에서 새로 결정
+		EVENT_LOG("[EVENT] New day started, counters reset");
 	}
 
 	CityCode cityCode = EncodeCityState(metrics);
@@ -654,6 +665,8 @@ void EventManager::ProcessDailyEvents(
 		if (eventCount < 0) eventCount = 0;
 	}
 
+	EVENT_LOG("[EVENT] candidates=" << candidates.size() << ", eventCount=" << eventCount);
+
 	for (int i = 0; i < eventCount; ++i) {
 		const EventDef* def = candidates[i];
 		ActiveEvent event = ActivateEvent(*def, cityCode, humans);
@@ -663,7 +676,12 @@ void EventManager::ProcessDailyEvents(
 		lastFiredDay[def->id] = currentDay + cooldownDist(rng);
 
 		scheduledEvents.push_back(std::move(event));
+		EVENT_LOG("[EVENT] Scheduled: " << def->name
+				  << ", triggerRatio=" << scheduledEvents.back().triggerTimeRatio
+				  << ", requiresPlayer=" << scheduledEvents.back().requiresPlayer);
 	}
+
+	EVENT_LOG("[EVENT] Total scheduled events: " << scheduledEvents.size());
 }
 
 
@@ -673,8 +691,19 @@ void EventManager::UpdateTime(
 	City& city,
 	std::vector<std::unique_ptr<Human>>& humans)
 {
+	static float lastLoggedRatio = -1.0f;
+	// 10% 단위로 로그 출력
+	if (static_cast<int>(dayRatio * 10) != static_cast<int>(lastLoggedRatio * 10)) {
+		lastLoggedRatio = dayRatio;
+		EVENT_LOG("[EVENT] UpdateTime dayRatio=" << (dayRatio * 100) << "%"
+				  << ", scheduledEvents=" << scheduledEvents.size()
+				  << ", pendingPlayer=" << pendingPlayerEvents.size());
+	}
+
 	for (auto& event : scheduledEvents) {
 		if (!event.hasTriggered && dayRatio >= event.triggerTimeRatio) {
+			EVENT_LOG("[EVENT] Triggering: " << event.name
+					  << " at ratio=" << (dayRatio * 100) << "%");
 			event.hasTriggered = true;
 			TriggerEvent(event, city, humans);
 		}
@@ -702,8 +731,11 @@ void EventManager::TriggerEvent(
 
 	if (event.requiresPlayer) {
 		pendingPlayerEvents.push_back(event);
+		EVENT_LOG("[EVENT] Added to pendingPlayerEvents: " << event.name
+				  << ", total pending=" << pendingPlayerEvents.size());
 	}
 	else {
+		EVENT_LOG("[EVENT] Immediate effect applied: " << event.name);
 		ApplyEffects(def->immediateEffects, def->effectScope, city,
 			event.affectedHumans, humans);
 	}

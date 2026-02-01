@@ -106,9 +106,10 @@ void Human::UpdateDrive(float deltaTime, CityMetrics city)
 {
     // ΔTime을 초 단위로 받음
     // 최대 변화량 상수
-    const int MAX_STRESS_DELTA = 50;     // 1초 기준 최대 변화량
+    const int MAX_STRESS_DELTA = 15;     // 1초 기준 최대 변화량 (기존 50의 30%)
     const int MAX_MOTIVATION_DELTA = 30;
     const int MAX_SOCIAL_DELTA = 20;
+    const int MAX_FATIGUE_DELTA = 8;     // 하루 평균 20% 상승 목표
 
     // --- StressLoad ---
     int stressDelta = MAX_STRESS_DELTA * (10000 - city.mood) / 10000;
@@ -138,7 +139,7 @@ void Human::UpdateDrive(float deltaTime, CityMetrics city)
     drives.senseOfControl = std::clamp(drives.senseOfControl + socialDelta * deltaTime, 0.f, 10000.f);
 
     // --- Fatigue & EmotionalArousal ---
-    int fatigueDelta = MAX_STRESS_DELTA * (10000 - city.activity) / 10000;
+    int fatigueDelta = MAX_FATIGUE_DELTA * (10000 - city.activity) / 10000;
     drives.fatigue = std::clamp(drives.fatigue + fatigueDelta * deltaTime, 0.f, 10000.f);
 
     int arousalDelta = MAX_SOCIAL_DELTA * (10000 - city.mood) / 10000;
