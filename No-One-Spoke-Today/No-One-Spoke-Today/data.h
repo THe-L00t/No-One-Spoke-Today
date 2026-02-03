@@ -1,4 +1,6 @@
 #pragma once
+#include <vector>
+#include <algorithm>
 
 // Human ==============================================================================================
 struct Trait {
@@ -50,6 +52,101 @@ struct MentalState {
 	ControlState control;      // 통제감/의존
 };
 
+
+// Region ===========================================================================================
+enum class Region {
+	Cockpit,			// 0: 조타실 (플레이어 시작 위치)
+	OuterWallMaintenance,	// 1: 외벽정비구역
+	Canteen,			// 2: 식당
+	RecyclingPlant,		// 3: 순환정제소
+	VerticalFarm,		// 4: 수직농장
+	LowerDrive,			// 5: 하부구동부
+	CentralPowerway,	// 6: 중앙동력로
+	ResidentialArea1,	// 7: 거주구역1
+	ResidentialArea2,	// 8: 거주구역2
+	COUNT				// 구역 수
+};
+
+// 구역 이름 반환
+inline const char* GetRegionName(Region region) {
+	switch (region) {
+	case Region::Cockpit:				return "조타실";
+	case Region::OuterWallMaintenance:	return "외벽정비구역";
+	case Region::Canteen:				return "식당";
+	case Region::RecyclingPlant:		return "순환정제소";
+	case Region::VerticalFarm:			return "수직농장";
+	case Region::LowerDrive:			return "하부구동부";
+	case Region::CentralPowerway:		return "중앙동력로";
+	case Region::ResidentialArea1:		return "거주구역1";
+	case Region::ResidentialArea2:		return "거주구역2";
+	default:							return "알 수 없음";
+	}
+}
+
+// 구역 연결 그래프 (인접 리스트)
+// 구조:
+//                    [조타실] ← 플레이어 시작 위치
+//                       │
+//                 [외벽정비구역]
+//                    /  │  \
+//                   /   │   \
+//            [식당]───[순환정제소]
+//             / |  \    /  |
+//            /  |   \  /   |
+//     [거주구역1]  [수직농장]  [거주구역2]
+//           |
+//     [중앙동력로]
+//           │
+//     [하부구동부]
+
+inline std::vector<Region> GetAdjacentRegions(Region region) {
+	switch (region) {
+	case Region::Cockpit:
+		return { Region::OuterWallMaintenance };
+	case Region::OuterWallMaintenance:
+		return { Region::Cockpit, Region::Canteen, Region::RecyclingPlant };
+	case Region::Canteen:
+		return { Region::OuterWallMaintenance, Region::RecyclingPlant, Region::ResidentialArea1, Region::VerticalFarm };
+	case Region::RecyclingPlant:
+		return { Region::OuterWallMaintenance, Region::Canteen, Region::VerticalFarm, Region::ResidentialArea2 };
+	case Region::VerticalFarm:
+		return { Region::Canteen, Region::RecyclingPlant };
+	case Region::LowerDrive:
+		return { Region::CentralPowerway };
+	case Region::CentralPowerway:
+		return { Region::LowerDrive, Region::ResidentialArea1 };
+	case Region::ResidentialArea1:
+		return { Region::Canteen, Region::CentralPowerway };
+	case Region::ResidentialArea2:
+		return { Region::RecyclingPlant };
+	default:
+		return {};
+	}
+}
+
+// 두 구역이 연결되어 있는지 확인
+inline bool AreRegionsConnected(Region from, Region to) {
+	auto adjacent = GetAdjacentRegions(from);
+	return std::find(adjacent.begin(), adjacent.end(), to) != adjacent.end();
+}
+
+// 구역별 기본 인구 배정 비율 (200명 기준)
+// 조타실: 0, 외벽정비: 10, 식당: 10, 순환정제소: 10, 수직농장: 16
+// 하부구동부: 6, 중앙동력로: 8, 거주구역1: 70, 거주구역2: 70
+inline int GetRegionPopulationRatio(Region region) {
+	switch (region) {
+	case Region::Cockpit:				return 0;	// 플레이어만 상주
+	case Region::OuterWallMaintenance:	return 10;	// 5%
+	case Region::Canteen:				return 10;	// 5%
+	case Region::RecyclingPlant:		return 10;	// 5%
+	case Region::VerticalFarm:			return 16;	// 8%
+	case Region::LowerDrive:			return 6;	// 3%
+	case Region::CentralPowerway:		return 8;	// 4%
+	case Region::ResidentialArea1:		return 70;	// 35%
+	case Region::ResidentialArea2:		return 70;	// 35%
+	default:							return 0;
+	}
+}
 
 // city =============================================================================================
 struct CityMetrics {		// 0~10000

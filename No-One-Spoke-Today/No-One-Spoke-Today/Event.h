@@ -149,6 +149,13 @@ enum class EffectType {
 	Custom				// 확장용
 };
 
+// 미방문 구역 이벤트 처리 방식
+enum class UnresolvedBehavior {
+	AutoResolve,	// 하루 종료 시 랜덤 선택지 자동 적용
+	Expire,			// 효과 없이 소멸
+	CarryOver		// 다음 날로 이월
+};
+
 enum class DriveField {
 	StressLoad, EmotionalArousal, Fatigue, CognitiveCapacity,
 	InterpersonalTrust, SocialSafety, SenseOfControl, Motivation
@@ -240,12 +247,16 @@ struct EventDef {
 	std::vector<Choice> choices;
 	std::vector<EffectData> immediateEffects;	// 선택지 없을 때
 
+	// 미방문 시 처리 방식
+	UnresolvedBehavior unresolvedBehavior;
+
 	EventDef()
 		: category(EventCategory::Environment)
 		, cooldownMin(1), cooldownMax(7)
 		, effectScope(EffectScope::Triggered)
 		, effectRegionId(-1)
 		, requiresPlayer(false)
+		, unresolvedBehavior(UnresolvedBehavior::AutoResolve)
 	{}
 };
 
@@ -266,10 +277,17 @@ struct ActiveEvent {
 	std::vector<Choice> choices;
 	int chosenIndex;
 
+	// 구역 이벤트 관련
+	int eventRegionId;				// 이벤트 발생 구역 ID (-1 = 전역 이벤트)
+	bool isRegionEvent;				// 구역 특정 이벤트 여부
+	UnresolvedBehavior unresolvedBehavior;	// 미방문 시 처리 방식
+
 	ActiveEvent()
 		: requiresPlayer(false), isActive(false)
 		, triggerTimeRatio(0.0f), hasTriggered(false)
 		, chosenIndex(-1)
+		, eventRegionId(-1), isRegionEvent(false)
+		, unresolvedBehavior(UnresolvedBehavior::AutoResolve)
 	{}
 };
 
@@ -307,6 +325,14 @@ public:
 	void ApplyPlayerChoice(int choiceIndex, City& city,
 		std::vector<std::unique_ptr<Human>>& humans);
 
+	// 구역 이벤트 처리
+	bool HasPendingRegionEvent(int regionId) const;
+	const ActiveEvent* GetPendingRegionEvent(int regionId) const;
+	void ProcessPendingRegionEvents(int playerRegionId, City& city,
+		std::vector<std::unique_ptr<Human>>& humans);
+	void ProcessUnresolvedEvents(City& city,
+		std::vector<std::unique_ptr<Human>>& humans);	// 하루 종료 시 미처리 이벤트 처리
+
 	// 게임 상태 저장/로드
 	void SaveState(std::ofstream& out) const;
 	void LoadState(std::ifstream& in);
@@ -343,6 +369,7 @@ private:
 	std::vector<EventDef> definitions;
 	std::deque<ActiveEvent> scheduledEvents;	// 오늘 발생 예정
 	std::deque<ActiveEvent> pendingPlayerEvents;
+	std::deque<ActiveEvent> pendingRegionPlayerEvents;	// 미방문 구역의 선택형 이벤트 대기열
 	std::unordered_map<std::string, int> lastFiredDay;
 	int minEventsPerDay{ 2 };
 	int maxEventsPerDay{ 6 };

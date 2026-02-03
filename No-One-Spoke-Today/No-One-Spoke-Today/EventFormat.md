@@ -91,6 +91,7 @@ min_human_count   = 0
 | 필드 | 타입 | 설명 |
 |------|------|------|
 | `effect_scope` | enum | 기본 효과 적용 대상 |
+| `unresolved_behavior` | enum | 미방문 구역 이벤트 처리 방식 (기본값: `AutoResolve`) |
 
 #### Effect Scope 값
 
@@ -101,6 +102,14 @@ min_human_count   = 0
 | `City` | 도시 지표만 (Human 영향 없음) |
 | `Region` | 특정 지역의 Human들 (region_id 사용) |
 | `Custom` | 커스텀 로직 (custom_effect_id 필요) |
+
+#### UnresolvedBehavior 값 (구역 이벤트용)
+
+| 값 | 설명 |
+|----|------|
+| `AutoResolve` | 하루 종료 시 랜덤 선택지 자동 적용 |
+| `Expire` | 효과 없이 소멸 |
+| `CarryOver` | 다음 날로 이월 |
 
 ---
 
@@ -242,6 +251,20 @@ choice_N_effect   = [EffectType], [Field], [Delta], [Scope]
 | 필드 | Shift | Mask |
 |------|-------|------|
 | Region | 50 | `0x1C000000000000` |
+
+#### Region ID 값
+
+| ID | 구역명 | 설명 |
+|----|--------|------|
+| 0 | 조타실 | 플레이어 시작 위치 |
+| 1 | 외벽정비구역 | 외벽 정비 담당 |
+| 2 | 식당 | 취사/서비스 |
+| 3 | 순환정제소 | 자원 재활용 |
+| 4 | 수직농장 | 식량 생산 |
+| 5 | 하부구동부 | 기계 정비 |
+| 6 | 중앙동력로 | 동력 관리 |
+| 7 | 거주구역1 | 주거 공간 |
+| 8 | 거주구역2 | 주거 공간 |
 
 ---
 
@@ -433,3 +456,4 @@ data/events.txt
 | 버전 | 날짜 | 변경 내용 |
 |------|------|----------|
 | 1.0 | 2025-01 | 초기 버전 |
+| 1.1 | 2025-01 | 구역 시스템 추가 (Region ID, unresolved_behavior) |

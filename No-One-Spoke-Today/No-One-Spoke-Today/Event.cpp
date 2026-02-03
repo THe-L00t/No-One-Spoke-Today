@@ -108,6 +108,15 @@ namespace {
 		return 0;
 	}
 
+	// UnresolvedBehavior 문자열 파싱
+	UnresolvedBehavior ParseUnresolvedBehavior(const std::string& s) {
+		std::string lower = ToLower(s);
+		if (lower == "autoresolve") return UnresolvedBehavior::AutoResolve;
+		if (lower == "expire") return UnresolvedBehavior::Expire;
+		if (lower == "carryover") return UnresolvedBehavior::CarryOver;
+		return UnresolvedBehavior::AutoResolve;
+	}
+
 	// 효과 문자열 파싱: "EffectType, Field, Delta, Scope"
 	EffectData ParseEffect(const std::string& effectStr) {
 		EffectData eff;
@@ -207,8 +216,8 @@ HumanCode EncodeHumanState(const Human& human) {
 	code |= (static_cast<uint64_t>(ToLevel5(human.GetRigidity(), 100)) & 0b111) << RIGIDITY_SHIFT;
 	code |= (static_cast<uint64_t>(ToLevel5(human.GetEmotionalSensitivity(), 100)) & 0b111) << EMO_SENS_SHIFT;
 
-	// Region - Human에 GetRegion() 추가 필요
-	// code |= (static_cast<uint64_t>(human.GetRegion()) & 0b111) << REGION_SHIFT;
+	// Region
+	code |= (static_cast<uint64_t>(human.GetRegion()) & 0b111) << REGION_SHIFT;
 
 	return HumanCode(code);
 }
@@ -302,6 +311,9 @@ void EventManager::LoadEventDefsFromText(const std::string& filepath) {
 		else if (key == "effect_scope") currentDef.effectScope = ParseEffectScope(value);
 		else if (key == "effect_region_id") currentDef.effectRegionId = std::stoi(value);
 		else if (key == "custom_effect_id") currentDef.customEffectId = value;
+
+		// 미방문 시 처리 방식
+		else if (key == "unresolved_behavior") currentDef.unresolvedBehavior = ParseUnresolvedBehavior(value);
 
 		// 즉시 효과
 		else if (key == "immediate_effect") {
@@ -504,15 +516,25 @@ std::vector<Human*> EventManager::GetTriggeredHumans(
 {
 	std::vector<Human*> result;
 
-	// 랜덤 이벤트거나 Human 조건이 없으면 전체 반환
+	// Region 스코프인 경우 해당 구역만 필터링
+	bool filterByRegion = (trigger.scope == TriggerScope::Region && trigger.regionId >= 0);
+
+	// 랜덤 이벤트거나 Human 조건이 없으면 (구역 필터링만 적용)
 	if (trigger.isRandom || !trigger.checkHuman) {
 		for (auto& h : humans) {
+			if (filterByRegion && static_cast<int>(h->GetRegion()) != trigger.regionId) {
+				continue;
+			}
 			result.push_back(h.get());
 		}
 		return result;
 	}
 
 	for (auto& h : humans) {
+		// 구역 필터링
+		if (filterByRegion && static_cast<int>(h->GetRegion()) != trigger.regionId) {
+			continue;
+		}
 		HumanCode code = EncodeHumanState(*h);
 		if (CheckHumanCondition(trigger, code)) {
 			result.push_back(h.get());
@@ -546,8 +568,25 @@ std::vector<Human*> EventManager::DetermineAffectedHumans(
 		return {};
 
 	case EffectScope::Region:
-		// TODO: 특정 지역 Human만 반환 (region 필드 구현 필요)
-		return triggered;
+	{
+		// 특정 지역 Human만 반환
+		int regionId = def.effectRegionId;
+		if (regionId < 0) {
+			// effectRegionId가 -1이면 트리거 구역 사용
+			regionId = def.trigger.regionId;
+		}
+		if (regionId < 0) {
+			// 그래도 없으면 트리거된 인간들 반환
+			return triggered;
+		}
+		std::vector<Human*> regionHumans;
+		for (auto& h : allHumans) {
+			if (static_cast<int>(h->GetRegion()) == regionId) {
+				regionHumans.push_back(h.get());
+			}
+		}
+		return regionHumans;
+	}
 
 	case EffectScope::Custom:
 		// Custom은 커스텀 함수에서 직접 처리
@@ -573,6 +612,11 @@ ActiveEvent EventManager::ActivateEvent(
 	event.isActive = true;
 	event.choices = def.choices;
 	event.chosenIndex = -1;
+
+	// 구역 이벤트 정보 설정
+	event.eventRegionId = def.trigger.regionId;
+	event.isRegionEvent = (def.trigger.regionId >= 0);
+	event.unresolvedBehavior = def.unresolvedBehavior;
 
 	// 발생 시점 랜덤 (0.2 ~ 0.8 사이)
 	std::uniform_real_distribution<float> dist(0.2f, 0.8f);
@@ -767,7 +811,7 @@ void EventManager::ApplyEffects(
 			targets.clear();
 			break;
 		case EffectScope::Region:
-			// TODO: region 기반 필터링
+			// Region 스코프는 DetermineAffectedHumans에서 이미 처리됨
 			targets = affected;
 			break;
 		default:
@@ -869,6 +913,88 @@ void EventManager::ApplyPlayerChoice(
 	pendingPlayerEvents.pop_front();
 }
 
+// ========== 구역 이벤트 처리 ==========
+bool EventManager::HasPendingRegionEvent(int regionId) const {
+	for (const auto& event : pendingRegionPlayerEvents) {
+		if (event.eventRegionId == regionId) {
+			return true;
+		}
+	}
+	return false;
+}
+
+const ActiveEvent* EventManager::GetPendingRegionEvent(int regionId) const {
+	for (const auto& event : pendingRegionPlayerEvents) {
+		if (event.eventRegionId == regionId) {
+			return &event;
+		}
+	}
+	return nullptr;
+}
+
+void EventManager::ProcessPendingRegionEvents(int playerRegionId, City& city,
+	std::vector<std::unique_ptr<Human>>& humans)
+{
+	// 플레이어가 방문한 구역의 대기 이벤트를 메인 대기열로 이동
+	auto it = pendingRegionPlayerEvents.begin();
+	while (it != pendingRegionPlayerEvents.end()) {
+		if (it->eventRegionId == playerRegionId) {
+			pendingPlayerEvents.push_back(std::move(*it));
+			it = pendingRegionPlayerEvents.erase(it);
+			EVENT_LOG("[EVENT] Region event moved to pending: regionId=" << playerRegionId);
+		}
+		else {
+			++it;
+		}
+	}
+}
+
+void EventManager::ProcessUnresolvedEvents(City& city,
+	std::vector<std::unique_ptr<Human>>& humans)
+{
+	// 하루 종료 시 미처리 구역 이벤트 처리
+	std::deque<ActiveEvent> carryOverEvents;
+
+	for (auto& event : pendingRegionPlayerEvents) {
+		switch (event.unresolvedBehavior) {
+		case UnresolvedBehavior::AutoResolve:
+		{
+			// 랜덤 선택지 자동 적용
+			if (!event.choices.empty()) {
+				std::uniform_int_distribution<size_t> dist(0, event.choices.size() - 1);
+				int choiceIndex = static_cast<int>(dist(rng));
+				event.chosenIndex = choiceIndex;
+				const Choice& choice = event.choices[choiceIndex];
+
+				const EventDef* def = nullptr;
+				for (const auto& d : definitions) {
+					if (d.id == event.defId) {
+						def = &d;
+						break;
+					}
+				}
+
+				EffectScope scope = def ? def->effectScope : EffectScope::Triggered;
+				ApplyEffects(choice.effects, scope, city, event.affectedHumans, humans);
+				EVENT_LOG("[EVENT] AutoResolve: " << event.name << " -> choice " << choiceIndex);
+			}
+			break;
+		}
+		case UnresolvedBehavior::Expire:
+			// 효과 없이 소멸
+			EVENT_LOG("[EVENT] Expire: " << event.name);
+			break;
+		case UnresolvedBehavior::CarryOver:
+			// 다음 날로 이월
+			carryOverEvents.push_back(std::move(event));
+			EVENT_LOG("[EVENT] CarryOver: " << event.name);
+			break;
+		}
+	}
+
+	pendingRegionPlayerEvents = std::move(carryOverEvents);
+}
+
 
 // ========== 게임 상태 저장/로드 ==========
 void EventManager::SaveState(std::ofstream& out) const {
@@ -884,12 +1010,42 @@ void EventManager::SaveState(std::ofstream& out) const {
 	out.write(reinterpret_cast<const char*>(&lastProcessedDay), sizeof(lastProcessedDay));
 	out.write(reinterpret_cast<const char*>(&targetEventsToday), sizeof(targetEventsToday));
 	out.write(reinterpret_cast<const char*>(&eventsTriggeredToday), sizeof(eventsTriggeredToday));
+
+	// 미방문 구역 이벤트 대기열 저장
+	uint32_t pendingRegionCount = static_cast<uint32_t>(pendingRegionPlayerEvents.size());
+	out.write(reinterpret_cast<const char*>(&pendingRegionCount), sizeof(pendingRegionCount));
+	for (const auto& event : pendingRegionPlayerEvents) {
+		WriteString(out, event.defId);
+		WriteString(out, event.name);
+		WriteString(out, event.description);
+		out.write(reinterpret_cast<const char*>(&event.eventRegionId), sizeof(event.eventRegionId));
+		out.write(reinterpret_cast<const char*>(&event.isRegionEvent), sizeof(event.isRegionEvent));
+		out.write(reinterpret_cast<const char*>(&event.unresolvedBehavior), sizeof(event.unresolvedBehavior));
+		out.write(reinterpret_cast<const char*>(&event.requiresPlayer), sizeof(event.requiresPlayer));
+
+		// 선택지 저장
+		uint32_t choiceCount = static_cast<uint32_t>(event.choices.size());
+		out.write(reinterpret_cast<const char*>(&choiceCount), sizeof(choiceCount));
+		for (const auto& choice : event.choices) {
+			WriteString(out, choice.text);
+			uint32_t effectCount = static_cast<uint32_t>(choice.effects.size());
+			out.write(reinterpret_cast<const char*>(&effectCount), sizeof(effectCount));
+			for (const auto& eff : choice.effects) {
+				out.write(reinterpret_cast<const char*>(&eff.type), sizeof(eff.type));
+				out.write(reinterpret_cast<const char*>(&eff.targetField), sizeof(eff.targetField));
+				out.write(reinterpret_cast<const char*>(&eff.delta), sizeof(eff.delta));
+				out.write(reinterpret_cast<const char*>(&eff.scope), sizeof(eff.scope));
+				WriteString(out, eff.customId);
+			}
+		}
+	}
 }
 
 void EventManager::LoadState(std::ifstream& in) {
 	lastFiredDay.clear();
 	scheduledEvents.clear();
 	pendingPlayerEvents.clear();
+	pendingRegionPlayerEvents.clear();
 
 	// 쿨다운 정보 로드
 	uint32_t cooldownCount = 0;
@@ -905,6 +1061,43 @@ void EventManager::LoadState(std::ifstream& in) {
 	in.read(reinterpret_cast<char*>(&lastProcessedDay), sizeof(lastProcessedDay));
 	in.read(reinterpret_cast<char*>(&targetEventsToday), sizeof(targetEventsToday));
 	in.read(reinterpret_cast<char*>(&eventsTriggeredToday), sizeof(eventsTriggeredToday));
+
+	// 미방문 구역 이벤트 대기열 로드 (파일 끝이 아닌 경우만)
+	if (in.peek() != EOF) {
+		uint32_t pendingRegionCount = 0;
+		in.read(reinterpret_cast<char*>(&pendingRegionCount), sizeof(pendingRegionCount));
+		for (uint32_t i = 0; i < pendingRegionCount && in.good(); ++i) {
+			ActiveEvent event;
+			event.defId = ReadString(in);
+			event.name = ReadString(in);
+			event.description = ReadString(in);
+			in.read(reinterpret_cast<char*>(&event.eventRegionId), sizeof(event.eventRegionId));
+			in.read(reinterpret_cast<char*>(&event.isRegionEvent), sizeof(event.isRegionEvent));
+			in.read(reinterpret_cast<char*>(&event.unresolvedBehavior), sizeof(event.unresolvedBehavior));
+			in.read(reinterpret_cast<char*>(&event.requiresPlayer), sizeof(event.requiresPlayer));
+
+			// 선택지 로드
+			uint32_t choiceCount = 0;
+			in.read(reinterpret_cast<char*>(&choiceCount), sizeof(choiceCount));
+			event.choices.resize(choiceCount);
+			for (auto& choice : event.choices) {
+				choice.text = ReadString(in);
+				uint32_t effectCount = 0;
+				in.read(reinterpret_cast<char*>(&effectCount), sizeof(effectCount));
+				choice.effects.resize(effectCount);
+				for (auto& eff : choice.effects) {
+					in.read(reinterpret_cast<char*>(&eff.type), sizeof(eff.type));
+					in.read(reinterpret_cast<char*>(&eff.targetField), sizeof(eff.targetField));
+					in.read(reinterpret_cast<char*>(&eff.delta), sizeof(eff.delta));
+					in.read(reinterpret_cast<char*>(&eff.scope), sizeof(eff.scope));
+					eff.customId = ReadString(in);
+				}
+			}
+
+			event.isActive = true;
+			pendingRegionPlayerEvents.push_back(std::move(event));
+		}
+	}
 }
 
 

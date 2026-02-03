@@ -11,6 +11,24 @@ World::World()
 	{
 		humans.emplace_back(std::make_unique<Human>());
 	}
+
+	// 구역별 인구 배정
+	int regionCounts[static_cast<int>(Region::COUNT)] = { 0 };
+	int idx = 0;
+	for (int r = 0; r < static_cast<int>(Region::COUNT); ++r) {
+		Region region = static_cast<Region>(r);
+		int count = GetRegionPopulationRatio(region);
+		for (int j = 0; j < count && idx < humansNum; ++j) {
+			humans[idx]->SetRegion(region);
+			++idx;
+		}
+	}
+	// 나머지는 거주구역1에 배정
+	while (idx < humansNum) {
+		humans[idx]->SetRegion(Region::ResidentialArea1);
+		++idx;
+	}
+
 	city = std::make_unique<City>(humans);
 	eventManager = std::make_unique<EventManager>();
 
@@ -134,4 +152,86 @@ void World::ClearHumans()
 void World::AddHuman(std::unique_ptr<Human> h)
 {
 	humans.push_back(std::move(h));
+}
+
+// ========== 플레이어 구역 관리 ==========
+Region World::GetPlayerRegion() const
+{
+	return playerRegion;
+}
+
+void World::SetPlayerRegion(Region r)
+{
+	playerRegion = r;
+}
+
+bool World::MovePlayerToRegion(Region target)
+{
+	if (AreRegionsConnected(playerRegion, target)) {
+		playerRegion = target;
+		// 해당 구역의 미확인 이벤트 표시 해제
+		MarkRegionEventSeen(target);
+		return true;
+	}
+	return false;
+}
+
+std::vector<Region> World::GetAccessibleRegions() const
+{
+	return GetAdjacentRegions(playerRegion);
+}
+
+// ========== 구역별 시민 관리 ==========
+std::vector<Human*> World::GetHumansInRegion(Region r)
+{
+	std::vector<Human*> result;
+	for (auto& h : humans) {
+		if (h->GetRegion() == r) {
+			result.push_back(h.get());
+		}
+	}
+	return result;
+}
+
+int World::GetHumanCountInRegion(Region r) const
+{
+	int count = 0;
+	for (const auto& h : humans) {
+		if (h->GetRegion() == r) {
+			++count;
+		}
+	}
+	return count;
+}
+
+// ========== 구역 이벤트 알림 관리 ==========
+void World::AddRegionEventAlert(Region r, const std::string& eventName)
+{
+	regionEventAlerts.push_back({ r, eventName });
+	unseenEventRegions.insert(r);
+}
+
+const std::vector<std::pair<Region, std::string>>& World::GetRegionEventAlerts() const
+{
+	return regionEventAlerts;
+}
+
+void World::ClearRegionEventAlerts()
+{
+	regionEventAlerts.clear();
+}
+
+bool World::HasUnseenEventInRegion(Region r) const
+{
+	return unseenEventRegions.find(r) != unseenEventRegions.end();
+}
+
+void World::MarkRegionEventSeen(Region r)
+{
+	unseenEventRegions.erase(r);
+}
+
+const std::set<Region>& World::GetUnseenEventRegions() const
+{
+	return unseenEventRegions;
 }

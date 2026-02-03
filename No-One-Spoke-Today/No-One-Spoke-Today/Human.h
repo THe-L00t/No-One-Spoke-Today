@@ -42,9 +42,11 @@ public:
 
 	const std::string& GetName() const;
 	bool IsMale() const;
+	Region GetRegion() const;
 
 	void SetName(const std::string& n);
 	void SetMale(bool m);
+	void SetRegion(Region r);
 	void SetTraits(const Trait& t);
 	void SetDrives(const Drives& d);
 	void SetMentalState(const MentalState& ms);
@@ -56,6 +58,7 @@ private:
 
 	std::string name;
 	bool male;
-	
+	Region region{ Region::ResidentialArea1 };	// 소속 구역
+
 };
 

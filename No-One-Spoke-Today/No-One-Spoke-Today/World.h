@@ -24,12 +24,31 @@ public:
 	int GetDay() const;
 	float GetAccumulatedTime() const;
 
+	// 플레이어 구역 관리
+	Region GetPlayerRegion() const;
+	void SetPlayerRegion(Region r);
+	bool MovePlayerToRegion(Region target);
+	std::vector<Region> GetAccessibleRegions() const;
+
+	// 구역별 시민 관리
+	std::vector<Human*> GetHumansInRegion(Region r);
+	int GetHumanCountInRegion(Region r) const;
+
+	// 구역 이벤트 알림 관리
+	void AddRegionEventAlert(Region r, const std::string& eventName);
+	const std::vector<std::pair<Region, std::string>>& GetRegionEventAlerts() const;
+	void ClearRegionEventAlerts();
+	bool HasUnseenEventInRegion(Region r) const;
+	void MarkRegionEventSeen(Region r);
+	const std::set<Region>& GetUnseenEventRegions() const;
+
 	void SetCurrentDay(int d);
 	void SetMonth(int m);
 	void SetDay(int d);
 	void SetAccumulatedTime(float t);
 	void ClearHumans();
 	void AddHuman(std::unique_ptr<Human> h);
+
 private:
 	int currentDay{ 1 };
 	int month{ 4 };
@@ -41,5 +60,10 @@ private:
 	std::unique_ptr<City> city;
 	std::vector<std::unique_ptr<Human>> humans;
 	std::unique_ptr<EventManager> eventManager;
+
+	// 플레이어 위치 및 구역 이벤트 관리
+	Region playerRegion{ Region::Cockpit };
+	std::vector<std::pair<Region, std::string>> regionEventAlerts;
+	std::set<Region> unseenEventRegions;
 };
 

@@ -286,6 +286,11 @@ bool Human::IsMale() const
     return male;
 }
 
+Region Human::GetRegion() const
+{
+    return region;
+}
+
 void Human::SetName(const std::string& n)
 {
     name = n;
@@ -294,6 +299,11 @@ void Human::SetName(const std::string& n)
 void Human::SetMale(bool m)
 {
     male = m;
+}
+
+void Human::SetRegion(Region r)
+{
+    region = r;
 }
 
 void Human::SetTraits(const Trait& t)

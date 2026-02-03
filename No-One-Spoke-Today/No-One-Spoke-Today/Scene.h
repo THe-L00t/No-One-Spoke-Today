@@ -79,6 +79,13 @@ private:
 	std::vector<std::string> GetMatchingDialogueKeys(Human* h);
 	float GetRandomDialogueInterval();
 
+	// 구역 관련 함수
+	void DisplayRegionMap();
+	void DisplayMoveMenu();
+	void HandleRegionMove(char input);
+	void DisplayRegionEventAlert(Region region, const std::string& eventName);
+	std::string GetRegionStatusIcon(Region region);
+
 	World* world{ nullptr };
 
 	std::vector<std::string> dayLog;
@@ -97,6 +104,8 @@ private:
 	bool dayTransitionShown{ false };
 	bool firstVisit{ true };
 	bool dialoguesLoaded{ false };
+	bool showingMoveMenu{ false };
+	bool showingRegionMap{ false };
 	std::default_random_engine rng{ std::random_device{}() };
 };
 

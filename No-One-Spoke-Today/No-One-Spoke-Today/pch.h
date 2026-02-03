@@ -17,6 +17,7 @@
 #include <print>
 #include <conio.h>
 #include <deque>
+#include <set>
 
 #ifdef _WIN32
 #include <windows.h>

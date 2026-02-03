@@ -97,6 +97,8 @@ void GameScene::Enter(std::unique_ptr<World>& w)
 	dayStartDisplayed = false;
 	waitingForChoice = false;
 	eventDisplayed = false;
+	showingMoveMenu = false;
+	showingRegionMap = false;
 	statusUpdateTimer = 0.f;
 	dialogueTimer = 0.f;
 	nextDialogueInterval = GetRandomDialogueInterval();
@@ -188,6 +190,23 @@ void GameScene::Exit()
 
 void GameScene::HandleInput(char input)
 {
+	// 이동 메뉴 처리
+	if (showingMoveMenu) {
+		HandleRegionMove(input);
+		return;
+	}
+
+	// 구역 맵 표시 중이면 아무 키나 누르면 닫기
+	if (showingRegionMap) {
+		showingRegionMap = false;
+		system("cls");
+		DisplayDayStart();
+		for (const auto& d : dayLog) {
+			std::println("    \"{}\"", d);
+		}
+		return;
+	}
+
 	// 이벤트 선택 처리
 	if (waitingForChoice && world) {
 		EventManager* em = world->GetEventManager();
@@ -238,6 +257,22 @@ void GameScene::HandleInput(char input)
 	case 'S':
 		// 빠른 상태 확인
 		DisplayStatus();
+		break;
+	case 'm':
+	case 'M':
+		// 이동 메뉴 열기
+		if (!waitingForChoice) {
+			showingMoveMenu = true;
+			DisplayMoveMenu();
+		}
+		break;
+	case 'r':
+	case 'R':
+		// 구역 맵 표시
+		if (!waitingForChoice) {
+			showingRegionMap = true;
+			DisplayRegionMap();
+		}
 		break;
 	}
 }
@@ -573,7 +608,21 @@ void SaveScene::LoadWorld()
 		in.read(reinterpret_cast<char*>(&st), sizeof(st)); ms.control = static_cast<ControlState>(st);
 		h->SetMentalState(ms);
 
+		// 구역 (버전 2 이상에서만)
+		if (version >= 2) {
+			uint8_t regionVal;
+			in.read(reinterpret_cast<char*>(&regionVal), sizeof(regionVal));
+			h->SetRegion(static_cast<Region>(regionVal));
+		}
+
 		world->AddHuman(std::move(h));
+	}
+
+	// 플레이어 위치 로드 (버전 2 이상에서만)
+	if (version >= 2) {
+		uint8_t playerRegionVal;
+		in.read(reinterpret_cast<char*>(&playerRegionVal), sizeof(playerRegionVal));
+		world->SetPlayerRegion(static_cast<Region>(playerRegionVal));
 	}
 
 	// 이벤트 매니저 상태 로드
@@ -618,8 +667,8 @@ void SaveScene::SaveWorld()
 	std::ofstream out{ "data/" + fileName + ".bin", std::ios::binary };
 	if (not out) return;
 
-	// 버전
-	uint32_t version = 1;
+	// 버전 (2: 구역 시스템 추가)
+	uint32_t version = 2;
 	out.write(reinterpret_cast<const char*>(&version), sizeof(version));
 	std::cout << "버전 저장";
 	// 월드 시간 정보
@@ -684,8 +733,18 @@ void SaveScene::SaveWorld()
 		st = static_cast<uint8_t>(h->GetSocial());   out.write(reinterpret_cast<const char*>(&st), sizeof(st));
 		st = static_cast<uint8_t>(h->GetEnergy());   out.write(reinterpret_cast<const char*>(&st), sizeof(st));
 		st = static_cast<uint8_t>(h->GetControl());  out.write(reinterpret_cast<const char*>(&st), sizeof(st));
+
+		// 구역 (버전 2에서 추가)
+		uint8_t regionVal = static_cast<uint8_t>(h->GetRegion());
+		out.write(reinterpret_cast<const char*>(&regionVal), sizeof(regionVal));
 	}
 	std::cout << "인간 저장";
+
+	// 플레이어 위치 저장 (버전 2에서 추가)
+	uint8_t playerRegionVal = static_cast<uint8_t>(world->GetPlayerRegion());
+	out.write(reinterpret_cast<const char*>(&playerRegionVal), sizeof(playerRegionVal));
+	std::cout << "플레이어 위치 저장";
+
 	// 이벤트 매니저 상태
 	world->GetEventManager()->SaveState(out);
 
@@ -788,14 +847,25 @@ void GameScene::DisplayDayStart()
 	int avgStress = CalculateAverageStress();
 	int avgFatigue = CalculateAverageFatigue();
 
+	// 현재 구역 정보
+	Region currentRegion = world->GetPlayerRegion();
+	std::string regionName = GetRegionName(currentRegion);
+	int regionPopulation = world->GetHumanCountInRegion(currentRegion);
+
 	// 하루 단위로 일지 메시지 설정
 	currentGreeting = GetRandomMessage("greeting");
 	currentWheel = GetRandomMessage("wheel");
+
+	// 미확인 이벤트가 있는 구역 수
+	int unseenCount = static_cast<int>(world->GetUnseenEventRegions().size());
+	std::string alertText = unseenCount > 0 ? std::format("(!{})", unseenCount) : "";
 
 	// 대시보드 스타일 출력 (std::print 사용)
 	std::println("");
 	std::println("  ╔════════════════════════════════════════════════╗");
 	std::println("  ║  2156년 {:>2}월 {:>2}일                      Day {:>3} ║", month, dayOfMonth, totalDay);
+	std::println("  ╠════════════════════════════════════════════════╣");
+	std::println("  ║  [현재 위치] {:<12} (인원: {:>3}명)         ║", regionName, regionPopulation);
 	std::println("  ╠════════════════════════════════════════════════╣");
 	std::println("  ║  [도시 상태]             [시민 상태]           ║");
 	std::println("  ║  > 분위기: {:<8}     > 인구: {:>4}명         ║", moodText, population);
@@ -809,7 +879,7 @@ void GameScene::DisplayDayStart()
 	std::println("  ║  [진행률] ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   0%  ║");
 	std::println("  ║            0분 /  8분                          ║");
 	std::println("  ╚════════════════════════════════════════════════╝");
-	std::println("    [ESC] 메뉴  [S] 상세 상태");
+	std::println("    [ESC] 메뉴  [S] 상세 상태  [M] 이동 {}  [R] 구역맵", alertText);
 	std::println("");
 }
 
@@ -897,15 +967,26 @@ void GameScene::DisplayStatus()
 	int avgStress = CalculateAverageStress();
 	int avgFatigue = CalculateAverageFatigue();
 
+	// 현재 구역 정보
+	Region currentRegion = world->GetPlayerRegion();
+	std::string regionName = GetRegionName(currentRegion);
+	int regionPopulation = world->GetHumanCountInRegion(currentRegion);
+
 	float accTime = world->GetAccumulatedTime();
 	float ratio = accTime / 480.0f;
 	std::string progressBar = GetProgressBar(ratio, 30);
 	int minutes = static_cast<int>(accTime / 60.0f);
 	int totalMinutes = 8;
 
+	// 미확인 이벤트가 있는 구역 수
+	int unseenCount = static_cast<int>(world->GetUnseenEventRegions().size());
+	std::string alertText = unseenCount > 0 ? std::format("(!{})", unseenCount) : "";
+
 	std::println("");
 	std::println("  ╔════════════════════════════════════════════════╗");
 	std::println("  ║  2156년 {:>2}월 {:>2}일                      Day {:>3} ║", month, dayOfMonth, totalDay);
+	std::println("  ╠════════════════════════════════════════════════╣");
+	std::println("  ║  [현재 위치] {:<12} (인원: {:>3}명)         ║", regionName, regionPopulation);
 	std::println("  ╠════════════════════════════════════════════════╣");
 	std::println("  ║  [도시 상태]             [시민 상태]           ║");
 	std::println("  ║  > 분위기: {:<8}     > 인구: {:>4}명         ║", moodText, population);
@@ -919,7 +1000,7 @@ void GameScene::DisplayStatus()
 	std::println("  ║  [진행률] {} {:>3}%  ║", progressBar, static_cast<int>(ratio * 100));
 	std::println("  ║           {:>2}분 / {:>2}분                          ║", minutes, totalMinutes);
 	std::println("  ╚════════════════════════════════════════════════╝");
-	std::println("    [ESC] 메뉴  [S] 상세 상태");
+	std::println("    [ESC] 메뉴  [S] 상세 상태  [M] 이동 {}  [R] 구역맵", alertText);
 	std::println("");
 
 	// 저장된 대사들 다시 출력
@@ -1198,4 +1279,151 @@ void GameScene::DisplayCitizenDialogue()
 	// 대사 저장 및 출력
 	dayLog.push_back(dialogue);
 	std::println("    \"{}\"", dialogue);
+}
+
+// ========== 구역 관련 함수 ==========
+std::string GameScene::GetRegionStatusIcon(Region region)
+{
+	if (!world) return " ";
+	if (world->GetPlayerRegion() == region) return "●";  // 현재 위치
+	if (world->HasUnseenEventInRegion(region)) return "!";  // 미확인 이벤트
+	return "○";
+}
+
+void GameScene::DisplayRegionMap()
+{
+	if (!world) return;
+
+	system("cls");
+
+	std::println("");
+	std::println("  ╔═══════════════════════════════════════════════════╗");
+	std::println("  ║                    [구역 맵]                      ║");
+	std::println("  ╠═══════════════════════════════════════════════════╣");
+	std::println("  ║                                                   ║");
+	std::println("  ║                  [{}] 조타실                      ║", GetRegionStatusIcon(Region::Cockpit));
+	std::println("  ║                       │                           ║");
+	std::println("  ║                [{}] 외벽정비구역                  ║", GetRegionStatusIcon(Region::OuterWallMaintenance));
+	std::println("  ║                    /  │  \\                        ║");
+	std::println("  ║                   /   │   \\                       ║");
+	std::println("  ║          [{}] 식당───[{}] 순환정제소              ║",
+		GetRegionStatusIcon(Region::Canteen), GetRegionStatusIcon(Region::RecyclingPlant));
+	std::println("  ║           / |  \\    /  |                          ║");
+	std::println("  ║          /  |   \\  /   |                          ║");
+	std::println("  ║   [{}] 거주1  [{}] 수직농장  [{}] 거주2           ║",
+		GetRegionStatusIcon(Region::ResidentialArea1),
+		GetRegionStatusIcon(Region::VerticalFarm),
+		GetRegionStatusIcon(Region::ResidentialArea2));
+	std::println("  ║        |                                          ║");
+	std::println("  ║   [{}] 중앙동력로                                 ║", GetRegionStatusIcon(Region::CentralPowerway));
+	std::println("  ║        │                                          ║");
+	std::println("  ║   [{}] 하부구동부                                 ║", GetRegionStatusIcon(Region::LowerDrive));
+	std::println("  ║                                                   ║");
+	std::println("  ╠═══════════════════════════════════════════════════╣");
+	std::println("  ║  ● 현재 위치    ! 미확인 이벤트    ○ 일반        ║");
+	std::println("  ╠═══════════════════════════════════════════════════╣");
+
+	// 구역별 인구 표시
+	std::println("  ║  [구역별 인원]                                    ║");
+	std::println("  ║  조타실:{:>3}  외벽정비:{:>3}  식당:{:>3}  순환정제:{:>3}  ║",
+		world->GetHumanCountInRegion(Region::Cockpit),
+		world->GetHumanCountInRegion(Region::OuterWallMaintenance),
+		world->GetHumanCountInRegion(Region::Canteen),
+		world->GetHumanCountInRegion(Region::RecyclingPlant));
+	std::println("  ║  수직농장:{:>3}  거주1:{:>3}  거주2:{:>3}             ║",
+		world->GetHumanCountInRegion(Region::VerticalFarm),
+		world->GetHumanCountInRegion(Region::ResidentialArea1),
+		world->GetHumanCountInRegion(Region::ResidentialArea2));
+	std::println("  ║  중앙동력로:{:>3}  하부구동부:{:>3}                    ║",
+		world->GetHumanCountInRegion(Region::CentralPowerway),
+		world->GetHumanCountInRegion(Region::LowerDrive));
+
+	std::println("  ╚═══════════════════════════════════════════════════╝");
+	std::println("    아무 키나 누르면 돌아갑니다...");
+}
+
+void GameScene::DisplayMoveMenu()
+{
+	if (!world) return;
+
+	system("cls");
+
+	Region currentRegion = world->GetPlayerRegion();
+	std::vector<Region> adjacent = world->GetAccessibleRegions();
+
+	std::println("");
+	std::println("  ╔════════════════════════════════════════════════╗");
+	std::println("  ║                   [구역 이동]                   ║");
+	std::println("  ╠════════════════════════════════════════════════╣");
+	std::println("  ║  현재 위치: {:<12}                       ║", GetRegionName(currentRegion));
+	std::println("  ╠════════════════════════════════════════════════╣");
+	std::println("  ║  이동 가능한 구역:                             ║");
+
+	for (size_t i = 0; i < adjacent.size(); ++i) {
+		Region r = adjacent[i];
+		std::string icon = world->HasUnseenEventInRegion(r) ? " !" : "";
+		int population = world->GetHumanCountInRegion(r);
+		std::println("  ║    {}. {:<14} (인원: {:>3}명){}         ║",
+			i + 1, GetRegionName(r), population, icon);
+	}
+
+	// 빈 줄 채우기 (최대 5개 선택지 기준)
+	for (size_t i = adjacent.size(); i < 5; ++i) {
+		std::println("  ║                                                ║");
+	}
+
+	std::println("  ╠════════════════════════════════════════════════╣");
+	std::println("  ║  ! : 미확인 이벤트가 있는 구역                  ║");
+	std::println("  ╚════════════════════════════════════════════════╝");
+	std::println("    숫자 키로 이동, ESC로 취소");
+}
+
+void GameScene::HandleRegionMove(char input)
+{
+	if (!world) return;
+
+	if (input == 27) {  // ESC
+		showingMoveMenu = false;
+		system("cls");
+		DisplayDayStart();
+		for (const auto& d : dayLog) {
+			std::println("    \"{}\"", d);
+		}
+		return;
+	}
+
+	std::vector<Region> adjacent = world->GetAccessibleRegions();
+	int choice = input - '1';
+
+	if (choice >= 0 && choice < static_cast<int>(adjacent.size())) {
+		Region targetRegion = adjacent[choice];
+		bool moved = world->MovePlayerToRegion(targetRegion);
+
+		if (moved) {
+			// 구역 이벤트 처리 (플레이어가 방문한 구역)
+			EventManager* em = world->GetEventManager();
+			if (em) {
+				em->ProcessPendingRegionEvents(static_cast<int>(targetRegion), *world->GetCity(), world->GetHumansVector());
+			}
+
+			// 이동 메시지 추가
+			std::string moveLog = std::format("[이동] {} 구역으로 이동했습니다.", GetRegionName(targetRegion));
+			dayLog.push_back(moveLog);
+		}
+
+		showingMoveMenu = false;
+		system("cls");
+		DisplayDayStart();
+		for (const auto& d : dayLog) {
+			std::println("    \"{}\"", d);
+		}
+	}
+}
+
+void GameScene::DisplayRegionEventAlert(Region region, const std::string& eventName)
+{
+	std::string regionName = GetRegionName(region);
+	std::string alertLog = std::format("[알림] {}에서 '{}' 이벤트 발생!", regionName, eventName);
+	dayLog.push_back(alertLog);
+	std::println("    {}", alertLog);
 }
