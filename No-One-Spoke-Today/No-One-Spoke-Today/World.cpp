@@ -70,6 +70,10 @@ World::World()
 
 	city = std::make_unique<City>(humans);
 	eventManager = std::make_unique<EventManager>();
+	navigation = std::make_unique<Navigation>();
+
+	// 네비게이션 초기화 (지역 데이터 로드 및 랜덤 배치)
+	navigation->Initialize();
 
 	// 이벤트 파일 로드
 	eventManager->LoadEventDefsFromText("data/events.txt");
@@ -94,6 +98,24 @@ void World::Update(float deltaTime)
 			month++;
 		}
 		eventManager->ProcessDailyEvents(*city, city->GetCityMet(), humans, currentDay);
+
+		// 네비게이션 업데이트 (이동 진행, 정비 체크)
+		if (navigation) {
+			if (navigation->IsInMaintenance()) {
+				navigation->UpdateMaintenance();
+			}
+			else if (navigation->HasActiveRoute()) {
+				navigation->UpdateTravel();
+
+				// 도착 체크
+				if (navigation->HasArrived()) {
+					navigation->CompleteArrival();
+				}
+
+				// 이동 중 힌트 발견 시도
+				navigation->TryDiscoverHintDuringTravel();
+			}
+		}
 	}
 
 	// 시간 경과에 따른 이벤트 발동 체크
@@ -102,8 +124,52 @@ void World::Update(float deltaTime)
 
 	// 인간/도시 업데이트
 	CityMetrics cm{city->GetCityMet()};
+
+	// 지형 보정값 가져오기
+	float terrainFatigueMod = 1.0f;
+	float terrainStressMod = 1.0f;
+	float terrainMotivationMod = 1.0f;
+	float terrainSafetyMod = 1.0f;
+	float terrainCognitionMod = 1.0f;
+
+	if (navigation) {
+		terrainFatigueMod = navigation->GetFatigueModifier();
+		terrainStressMod = navigation->GetStressModifier();
+		terrainMotivationMod = navigation->GetMotivationModifier();
+		terrainSafetyMod = navigation->GetSafetyModifier();
+		terrainCognitionMod = navigation->GetCognitionModifier();
+	}
+
 	for (auto& h : humans) {
 		h->UpdateDrive(deltaTime, cm);
+
+		// 지형 효과 적용 (하루 단위로 deltaTime 보정)
+		// 피로: 보정값이 1.0보다 크면 피로 증가
+		if (terrainFatigueMod > 1.0f) {
+			int fatigueDelta = static_cast<int>((terrainFatigueMod - 1.0f) * 5.0f * deltaTime);
+			h->ModifyFatigue(fatigueDelta);
+		}
+		// 스트레스: 보정값이 1.0보다 크면 스트레스 증가
+		if (terrainStressMod > 1.0f) {
+			int stressDelta = static_cast<int>((terrainStressMod - 1.0f) * 8.0f * deltaTime);
+			h->ModifyStressLoad(stressDelta);
+		}
+		// 동기: 보정값이 1.0보다 작으면 동기 감소
+		if (terrainMotivationMod < 1.0f) {
+			int motivationDelta = static_cast<int>((1.0f - terrainMotivationMod) * -6.0f * deltaTime);
+			h->ModifyMotivation(motivationDelta);
+		}
+		// 사회적 안전감: 보정값이 1.0보다 작으면 감소
+		if (terrainSafetyMod < 1.0f) {
+			int safetyDelta = static_cast<int>((1.0f - terrainSafetyMod) * -4.0f * deltaTime);
+			h->ModifySocialSafety(safetyDelta);
+		}
+		// 인지 능력: 보정값이 1.0보다 작으면 감소
+		if (terrainCognitionMod < 1.0f) {
+			int cognitionDelta = static_cast<int>((1.0f - terrainCognitionMod) * -3.0f * deltaTime);
+			h->ModifyCognitiveCapacity(cognitionDelta);
+		}
+
 		h->UpdateMentalState();
 	}
 	city->Update(humans);
@@ -117,6 +183,11 @@ EventManager* World::GetEventManager()
 City* World::GetCity()
 {
 	return city.get();
+}
+
+Navigation* World::GetNavigation()
+{
+	return navigation.get();
 }
 
 Human* World::GetHumans(int idx)

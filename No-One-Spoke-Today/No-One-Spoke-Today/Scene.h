@@ -86,6 +86,18 @@ private:
 	void DisplayRegionEventAlert(Region region, const std::string& eventName);
 	std::string GetRegionStatusIcon(Region region);
 
+	// 시민 정보 관련 함수
+	void DisplayCitizenInfo();
+	void HandleCitizenInfoInput(char input);
+	void HandleCitizenInfoArrow(int dir);
+
+	// 네비게이션 관련 함수
+	void DisplayNavigationMenu();    // 조타실: 목적지 설정
+	void HandleNavigationInput(char input);
+	void DisplayAngleMenu();         // 하부구동부: 각도 설정
+	void HandleAngleInput(char input);
+	void DisplayNavigationStatus();  // 현재 항행 상태 표시
+
 	World* world{ nullptr };
 
 	std::vector<std::string> dayLog;
@@ -106,6 +118,11 @@ private:
 	bool dialoguesLoaded{ false };
 	bool showingMoveMenu{ false };
 	bool showingRegionMap{ false };
+	bool showingCitizenInfo{ false };
+	bool showingNavigationMenu{ false };  // 조타실: 목적지 설정
+	bool showingAngleMenu{ false };       // 하부구동부: 각도 설정
+	int citizenInfoMode{ 0 };  // 0: 성향, 1: 누적값, 2: 상태
+	int angleInputBuffer{ 0 }; // 각도 입력 버퍼
 	std::default_random_engine rng{ std::random_device{}() };
 };
 

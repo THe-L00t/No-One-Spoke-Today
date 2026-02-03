@@ -99,6 +99,11 @@ void GameScene::Enter(std::unique_ptr<World>& w)
 	eventDisplayed = false;
 	showingMoveMenu = false;
 	showingRegionMap = false;
+	showingCitizenInfo = false;
+	showingNavigationMenu = false;
+	showingAngleMenu = false;
+	citizenInfoMode = 0;
+	angleInputBuffer = 0;
 	statusUpdateTimer = 0.f;
 	dialogueTimer = 0.f;
 	nextDialogueInterval = GetRandomDialogueInterval();
@@ -108,8 +113,9 @@ void GameScene::Update(float deltaTime)
 {
 	if (not world) return;
 
-	// 이동 메뉴나 구역 맵 표시 중이면 업데이트 중지
-	if (showingMoveMenu || showingRegionMap) {
+	// 메뉴 표시 중이면 업데이트 중지
+	if (showingMoveMenu || showingRegionMap || showingCitizenInfo ||
+		showingNavigationMenu || showingAngleMenu) {
 		return;
 	}
 
@@ -212,6 +218,24 @@ void GameScene::HandleInput(char input)
 		return;
 	}
 
+	// 시민 정보 표시 중
+	if (showingCitizenInfo) {
+		HandleCitizenInfoInput(input);
+		return;
+	}
+
+	// 네비게이션 메뉴 표시 중 (조타실)
+	if (showingNavigationMenu) {
+		HandleNavigationInput(input);
+		return;
+	}
+
+	// 각도 메뉴 표시 중 (하부구동부)
+	if (showingAngleMenu) {
+		HandleAngleInput(input);
+		return;
+	}
+
 	// 이벤트 선택 처리
 	if (waitingForChoice && world) {
 		EventManager* em = world->GetEventManager();
@@ -260,8 +284,12 @@ void GameScene::HandleInput(char input)
 		break;
 	case 's':
 	case 'S':
-		// 빠른 상태 확인
-		DisplayStatus();
+		// 시민 정보 표시
+		if (!waitingForChoice) {
+			showingCitizenInfo = true;
+			citizenInfoMode = 0;  // 성향부터 시작
+			DisplayCitizenInfo();
+		}
 		break;
 	case 'm':
 	case 'M':
@@ -279,11 +307,50 @@ void GameScene::HandleInput(char input)
 			DisplayRegionMap();
 		}
 		break;
+	case 'n':
+	case 'N':
+		// 네비게이션 메뉴 (조타실에서만)
+		if (!waitingForChoice && world->GetPlayerRegion() == Region::Cockpit) {
+			showingNavigationMenu = true;
+			system("cls");
+			DisplayNavigationMenu();
+		}
+		break;
+	case 'a':
+	case 'A':
+		// 각도 조정 메뉴 (하부구동부에서만)
+		if (!waitingForChoice && world->GetPlayerRegion() == Region::LowerDrive) {
+			showingAngleMenu = true;
+			angleInputBuffer = 0;
+			system("cls");
+			DisplayAngleMenu();
+		}
+		break;
 	}
 }
 
 void GameScene::sHandleInput(char input)
 {
+	// 시민 정보 표시 중 방향키 처리
+	if (showingCitizenInfo) {
+		HandleCitizenInfoArrow(input);
+		return;
+	}
+
+	// 각도 조정 중 방향키 처리
+	if (showingAngleMenu && world && world->GetNavigation()) {
+		Navigation* nav = world->GetNavigation();
+		switch (input) {
+		case 75:  // 왼쪽
+			nav->SetMovementAngle(nav->GetMovementAngle() - 1);
+			DisplayAngleMenu();
+			break;
+		case 77:  // 오른쪽
+			nav->SetMovementAngle(nav->GetMovementAngle() + 1);
+			DisplayAngleMenu();
+			break;
+		}
+	}
 }
 
 void MenuScene::Enter(std::unique_ptr<World>&)
@@ -633,6 +700,11 @@ void SaveScene::LoadWorld()
 	// 이벤트 매니저 상태 로드
 	world->GetEventManager()->LoadState(in);
 
+	// 네비게이션 상태 로드 (버전 3 이상에서만)
+	if (version >= 3 && world->GetNavigation()) {
+		world->GetNavigation()->LoadState(in);
+	}
+
 	in.close();
 	saveAble = true;
 	std::cout << "로드 완료: data/" << fileName << ".bin" << std::endl;
@@ -672,8 +744,8 @@ void SaveScene::SaveWorld()
 	std::ofstream out{ "data/" + fileName + ".bin", std::ios::binary };
 	if (not out) return;
 
-	// 버전 (2: 구역 시스템 추가)
-	uint32_t version = 2;
+	// 버전 (3: 네비게이션 시스템 추가)
+	uint32_t version = 3;
 	out.write(reinterpret_cast<const char*>(&version), sizeof(version));
 	std::cout << "버전 저장";
 	// 월드 시간 정보
@@ -752,6 +824,12 @@ void SaveScene::SaveWorld()
 
 	// 이벤트 매니저 상태
 	world->GetEventManager()->SaveState(out);
+
+	// 네비게이션 상태 저장 (버전 3에서 추가)
+	if (world->GetNavigation()) {
+		world->GetNavigation()->SaveState(out);
+		std::cout << "네비게이션 저장";
+	}
 
 	out.close();
 	std::cout << "저장 완료: data/" << fileName << ".bin" << std::endl;
@@ -884,7 +962,20 @@ void GameScene::DisplayDayStart()
 	std::println("  ║  [진행률] ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   0%  ║");
 	std::println("  ║            0분 /  8분                          ║");
 	std::println("  ╚════════════════════════════════════════════════╝");
-	std::println("    [ESC] 메뉴  [S] 상세 상태  [M] 이동 {}  [R] 구역맵", alertText);
+
+	// 기본 키 + 구역별 특수 키
+	std::string keyHints = std::format("[ESC] 메뉴  [S] 상세  [M] 이동 {}  [R] 맵", alertText);
+
+	// 조타실에서는 [N] 항로 추가
+	if (currentRegion == Region::Cockpit) {
+		keyHints += "  [N] 항로";
+	}
+	// 하부구동부에서는 [A] 각도 추가
+	else if (currentRegion == Region::LowerDrive) {
+		keyHints += "  [A] 각도";
+	}
+
+	std::println("    {}", keyHints);
 	std::println("");
 }
 
@@ -1005,7 +1096,20 @@ void GameScene::DisplayStatus()
 	std::println("  ║  [진행률] {} {:>3}%  ║", progressBar, static_cast<int>(ratio * 100));
 	std::println("  ║           {:>2}분 / {:>2}분                          ║", minutes, totalMinutes);
 	std::println("  ╚════════════════════════════════════════════════╝");
-	std::println("    [ESC] 메뉴  [S] 상세 상태  [M] 이동 {}  [R] 구역맵", alertText);
+
+	// 기본 키 + 구역별 특수 키
+	std::string keyHints = std::format("[ESC] 메뉴  [S] 상세  [M] 이동 {}  [R] 맵", alertText);
+
+	// 조타실에서는 [N] 항로 추가
+	if (currentRegion == Region::Cockpit) {
+		keyHints += "  [N] 항로";
+	}
+	// 하부구동부에서는 [A] 각도 추가
+	else if (currentRegion == Region::LowerDrive) {
+		keyHints += "  [A] 각도";
+	}
+
+	std::println("    {}", keyHints);
 	std::println("");
 
 	// 저장된 대사들 다시 출력
@@ -1413,3 +1517,337 @@ void GameScene::DisplayRegionEventAlert(Region region, const std::string& eventN
 	dayLog.push_back(alertLog);
 	std::println("    {}", alertLog);
 }
+
+// ========== 시민 정보 관련 함수 ==========
+void GameScene::DisplayCitizenInfo()
+{
+	if (!world) return;
+
+	system("cls");
+
+	// 모드에 따른 탭 표시
+	std::string modeNames[3] = { "성향", "누적값", "상태" };
+	std::string tabs = "";
+	for (int i = 0; i < 3; ++i) {
+		if (i == citizenInfoMode) {
+			tabs += std::format(" [{}] ", modeNames[i]);
+		}
+		else {
+			tabs += std::format("  {}  ", modeNames[i]);
+		}
+	}
+
+	std::println("");
+	std::println("  ╔════════════════════════════════════════════════════════════════╗");
+	std::println("  ║                        [시민 정보]                             ║");
+	std::println("  ╠════════════════════════════════════════════════════════════════╣");
+	std::println("  ║  {}                              ║", tabs);
+	std::println("  ╠════════════════════════════════════════════════════════════════╣");
+
+	// 구역별로 시민 정보 출력
+	for (int r = 0; r < static_cast<int>(Region::COUNT); ++r) {
+		Region region = static_cast<Region>(r);
+		std::vector<Human*> humansInRegion = world->GetHumansInRegion(region);
+
+		if (humansInRegion.empty()) continue;
+
+		std::println("  ║  [{:<12}] ({:>3}명)                                       ║",
+			GetRegionName(region), humansInRegion.size());
+
+		// 한 줄에 4명씩 표시
+		for (size_t i = 0; i < humansInRegion.size(); i += 4) {
+			std::string line = "  ║  ";
+
+			for (size_t j = i; j < i + 4 && j < humansInRegion.size(); ++j) {
+				Human* h = humansInRegion[j];
+				std::string gender = h->IsMale() ? "♂" : "♀";
+				std::string name = h->GetName();
+
+				std::string info;
+				switch (citizenInfoMode) {
+				case 0:  // 성향
+				{
+					int rat = h->GetRationality() / 10;
+					int agg = h->GetAggressiveness() / 10;
+					int pln = h->GetPlanning() / 10;
+					info = std::format("{}{} R{}A{}P{}", name, gender, rat, agg, pln);
+					break;
+				}
+				case 1:  // 누적값
+				{
+					int str = h->GetStressLoad() / 100;
+					int fat = h->GetFatigue() / 100;
+					int mot = h->GetMotivation() / 100;
+					info = std::format("{}{} S{}F{}M{}", name, gender, str, fat, mot);
+					break;
+				}
+				case 2:  // 상태
+				{
+					std::string arousal;
+					switch (h->GetArousal()) {
+					case ArousalState::Calm: arousal = "차분"; break;
+					case ArousalState::Tense: arousal = "긴장"; break;
+					case ArousalState::Irritable: arousal = "과민"; break;
+					case ArousalState::Hostile: arousal = "적대"; break;
+					}
+					std::string energy;
+					switch (h->GetEnergy()) {
+					case EnergyState::Normal: energy = "정상"; break;
+					case EnergyState::Fatigued: energy = "피로"; break;
+					case EnergyState::Exhausted: energy = "소진"; break;
+					}
+					info = std::format("{}{} {}/{}", name, gender, arousal, energy);
+					break;
+				}
+				}
+
+				line += std::format("{:<16}", info);
+			}
+
+			// 줄 맞춤
+			while (line.size() < 68) line += " ";
+			line += "║";
+			std::println("{}", line);
+		}
+
+		std::println("  ║                                                                  ║");
+	}
+
+	std::println("  ╚════════════════════════════════════════════════════════════════╝");
+	std::println("    [←/→] 모드 전환    [ESC] 닫기");
+}
+
+void GameScene::HandleCitizenInfoInput(char input)
+{
+	if (input == 27) {  // ESC
+		showingCitizenInfo = false;
+		system("cls");
+		DisplayDayStart();
+		for (const auto& d : dayLog) {
+			std::println("    \"{}\"", d);
+		}
+	}
+}
+
+void GameScene::HandleCitizenInfoArrow(int dir)
+{
+	switch (dir) {
+	case 75:  // 왼쪽
+		citizenInfoMode = (citizenInfoMode + 2) % 3;  // -1 mod 3
+		DisplayCitizenInfo();
+		break;
+	case 77:  // 오른쪽
+		citizenInfoMode = (citizenInfoMode + 1) % 3;
+		DisplayCitizenInfo();
+		break;
+	}
+}
+
+// ========== 네비게이션 관련 함수 ==========
+void GameScene::DisplayNavigationStatus()
+{
+	if (!world || !world->GetNavigation()) return;
+
+	Navigation* nav = world->GetNavigation();
+
+	std::println("  ──────────────── [항행 상태] ────────────────");
+	std::println("  현재 위치: ({}, {})", nav->GetCurrentX(), nav->GetCurrentY());
+	std::println("  현재 지형: {}", GetTerrainName(nav->GetCurrentTerrain()));
+	std::println("  현재 기온: {:.1f}°C", nav->GetCurrentTemperature());
+	std::println("");
+
+	if (nav->HasActiveRoute()) {
+		const Route& route = nav->GetCurrentRoute();
+		const MapRegion* dest = nav->GetRegion(route.destinationId);
+		std::string destName = dest ? dest->name : "알 수 없음";
+
+		std::println("  [목적지] {}", destName);
+		std::println("  총 거리: {} 단위", route.totalDistance);
+		std::println("  필요 각도: {}°", route.requiredAngle);
+		std::println("  현재 각도: {}° {}", nav->GetMovementAngle(),
+			nav->IsAngleCorrect() ? "(정확)" : "(조정 필요!)");
+		std::println("  남은 일수: {}일 / 총 {}일", nav->GetRemainingDays(), route.daysRequired);
+	}
+	else if (nav->IsInMaintenance()) {
+		std::println("  [정비 중] 남은 일수: {}일", nav->GetMaintenanceDaysLeft());
+	}
+	else {
+		std::println("  경로가 설정되지 않았습니다.");
+	}
+	std::println("");
+}
+
+void GameScene::DisplayNavigationMenu()
+{
+	if (!world || !world->GetNavigation()) return;
+
+	Navigation* nav = world->GetNavigation();
+
+	std::println("");
+	std::println("  ══════════════ [조타실 - 목적지 설정] ══════════════");
+	std::println("");
+
+	// 현재 상태 표시
+	DisplayNavigationStatus();
+
+	// 발견된 지역 목록 표시
+	auto discovered = nav->GetDiscoveredRegions();
+
+	if (discovered.empty()) {
+		std::println("  발견된 지역이 없습니다.");
+		std::println("  이동 중이나 대화를 통해 힌트를 얻으세요.");
+	}
+	else {
+		std::println("  [발견된 지역]");
+		int idx = 1;
+		for (const MapRegion* region : discovered) {
+			std::string visitedMark = region->visited ? "[방문]" : "[미방문]";
+			std::println("    {}. {} - {} ({})", idx, region->name,
+				GetTerrainName(region->terrain), visitedMark);
+			idx++;
+		}
+		std::println("");
+		std::println("  숫자로 목적지 선택, [C] 경로 취소, [ESC] 닫기");
+	}
+
+	std::print("  > ");
+}
+
+void GameScene::HandleNavigationInput(char input)
+{
+	if (!world || !world->GetNavigation()) return;
+
+	Navigation* nav = world->GetNavigation();
+
+	if (input == 27) {  // ESC
+		showingNavigationMenu = false;
+		system("cls");
+		DisplayDayStart();
+		for (const auto& d : dayLog) {
+			std::println("    \"{}\"", d);
+		}
+		return;
+	}
+
+	if (input == 'c' || input == 'C') {
+		nav->CancelRoute();
+		std::println("\n  경로가 취소되었습니다.");
+		DisplayNavigationMenu();
+		return;
+	}
+
+	// 숫자 입력 처리
+	auto discovered = nav->GetDiscoveredRegions();
+	int choice = input - '1';
+
+	if (choice >= 0 && choice < static_cast<int>(discovered.size())) {
+		int regionId = discovered[choice]->id;
+		if (nav->SetDestination(regionId)) {
+			const MapRegion* dest = nav->GetRegion(regionId);
+			std::string logMsg = std::format("[항로] {}로 목적지 설정 (각도: {}°, 예상 {}일)",
+				dest->name, nav->GetRequiredAngle(), nav->GetCurrentRoute().daysRequired);
+			dayLog.push_back(logMsg);
+
+			std::println("\n  >> {}로 목적지가 설정되었습니다.", dest->name);
+			std::println("     하부구동부에서 각도를 {}°로 맞춰주세요.", nav->GetRequiredAngle());
+		}
+		else {
+			std::println("\n  해당 지역으로 경로를 설정할 수 없습니다.");
+		}
+		DisplayNavigationMenu();
+	}
+}
+
+void GameScene::DisplayAngleMenu()
+{
+	if (!world || !world->GetNavigation()) return;
+
+	Navigation* nav = world->GetNavigation();
+
+	std::println("");
+	std::println("  ══════════════ [하부구동부 - 각도 조정] ══════════════");
+	std::println("");
+
+	// 현재 항행 상태
+	DisplayNavigationStatus();
+
+	// 각도 조정 UI
+	std::println("  [각도 조정]");
+	std::println("  현재 각도: {}°", nav->GetMovementAngle());
+
+	if (nav->HasActiveRoute()) {
+		std::println("  필요 각도: {}°", nav->GetRequiredAngle());
+		if (nav->IsAngleCorrect()) {
+			std::println("  >> 각도가 정확합니다. 이동 중...");
+		}
+		else {
+			int diff = nav->GetRequiredAngle() - nav->GetMovementAngle();
+			if (diff > 180) diff -= 360;
+			if (diff < -180) diff += 360;
+			std::println("  >> 조정 필요: {}° {}", std::abs(diff),
+				diff > 0 ? "(시계방향)" : "(반시계방향)");
+		}
+	}
+	else {
+		std::println("  목적지가 설정되지 않았습니다.");
+	}
+
+	std::println("");
+	std::println("  [←/→] 1° 조정  [A/D] 10° 조정  [숫자 입력] 직접 설정");
+	std::println("  [ESC] 닫기");
+	std::print("  > ");
+}
+
+void GameScene::HandleAngleInput(char input)
+{
+	if (!world || !world->GetNavigation()) return;
+
+	Navigation* nav = world->GetNavigation();
+
+	if (input == 27) {  // ESC
+		showingAngleMenu = false;
+		angleInputBuffer = 0;
+		system("cls");
+		DisplayDayStart();
+		for (const auto& d : dayLog) {
+			std::println("    \"{}\"", d);
+		}
+		return;
+	}
+
+	// 숫자 입력 (직접 각도 설정)
+	if (input >= '0' && input <= '9') {
+		angleInputBuffer = angleInputBuffer * 10 + (input - '0');
+		if (angleInputBuffer > 359) {
+			angleInputBuffer = angleInputBuffer % 360;
+		}
+		std::print("{}", input);
+		return;
+	}
+
+	// Enter로 각도 확정
+	if (input == '\r' && angleInputBuffer > 0) {
+		nav->SetMovementAngle(angleInputBuffer);
+		std::println("\n  >> 각도를 {}°로 설정했습니다.", angleInputBuffer);
+		angleInputBuffer = 0;
+		DisplayAngleMenu();
+		return;
+	}
+
+	// A/D로 10도 조정
+	if (input == 'a' || input == 'A') {
+		int newAngle = nav->GetMovementAngle() - 10;
+		nav->SetMovementAngle(newAngle);
+		DisplayAngleMenu();
+		return;
+	}
+	if (input == 'd' || input == 'D') {
+		int newAngle = nav->GetMovementAngle() + 10;
+		nav->SetMovementAngle(newAngle);
+		DisplayAngleMenu();
+		return;
+	}
+}
+
+// 방향키 처리를 위한 sHandleInput에서 각도 조정
+// Scene.cpp의 sHandleInput 함수 내에서 처리

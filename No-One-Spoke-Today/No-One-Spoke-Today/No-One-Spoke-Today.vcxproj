@@ -136,6 +136,7 @@
     <ClCompile Include="Framework.cpp" />
     <ClCompile Include="Human.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Navigation.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
@@ -150,6 +151,7 @@
     <ClInclude Include="data.h" />
     <ClInclude Include="Framework.h" />
     <ClInclude Include="Human.h" />
+    <ClInclude Include="Navigation.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Scene.h" />
     <ClInclude Include="Time.h" />

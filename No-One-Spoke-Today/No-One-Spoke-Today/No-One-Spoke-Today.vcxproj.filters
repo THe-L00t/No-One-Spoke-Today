@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="소스 파일">
@@ -34,6 +34,15 @@
     <Filter Include="소스 파일\World">
       <UniqueIdentifier>{f6a518ac-d48f-4251-becd-f1ac4a7f4058}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\Event">
+      <UniqueIdentifier>{a1b2c3d4-e5f6-7890-abcd-ef1234567890}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Navigation">
+      <UniqueIdentifier>{b2c3d4e5-f6a7-8901-bcde-f12345678901}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Data">
+      <UniqueIdentifier>{c3d4e5f6-a7b8-9012-cdef-123456789012}</UniqueIdentifier>
+    </Filter>
     <Filter Include="리소스 파일\dialogue">
       <UniqueIdentifier>{2bdf8400-5dbe-4c76-b092-6d55c406d128}</UniqueIdentifier>
     </Filter>
@@ -64,7 +73,10 @@
       <Filter>소스 파일\World</Filter>
     </ClCompile>
     <ClCompile Include="Event.cpp">
-      <Filter>소스 파일</Filter>
+      <Filter>소스 파일\Event</Filter>
+    </ClCompile>
+    <ClCompile Include="Navigation.cpp">
+      <Filter>소스 파일\Navigation</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -92,11 +104,14 @@
     <ClInclude Include="World.h">
       <Filter>소스 파일\World</Filter>
     </ClInclude>
-    <ClInclude Include="data.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
     <ClInclude Include="Event.h">
-      <Filter>헤더 파일</Filter>
+      <Filter>소스 파일\Event</Filter>
+    </ClInclude>
+    <ClInclude Include="Navigation.h">
+      <Filter>소스 파일\Navigation</Filter>
+    </ClInclude>
+    <ClInclude Include="data.h">
+      <Filter>소스 파일\Data</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

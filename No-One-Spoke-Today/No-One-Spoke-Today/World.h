@@ -3,6 +3,7 @@
 #include "City.h"
 #include "Human.h"
 #include "Event.h"
+#include "Navigation.h"
 
 
 class World
@@ -16,6 +17,7 @@ public:
 
 	EventManager* GetEventManager();
 	City* GetCity();
+	Navigation* GetNavigation();
 	Human* GetHumans(int);
 	int GetHumansSize() const;
 	std::vector<std::unique_ptr<Human>>& GetHumansVector();
@@ -60,6 +62,7 @@ private:
 	std::unique_ptr<City> city;
 	std::vector<std::unique_ptr<Human>> humans;
 	std::unique_ptr<EventManager> eventManager;
+	std::unique_ptr<Navigation> navigation;
 
 	// 플레이어 위치 및 구역 이벤트 관리
 	Region playerRegion{ Region::Cockpit };
