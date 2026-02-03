@@ -108,6 +108,11 @@ void GameScene::Update(float deltaTime)
 {
 	if (not world) return;
 
+	// 이동 메뉴나 구역 맵 표시 중이면 업데이트 중지
+	if (showingMoveMenu || showingRegionMap) {
+		return;
+	}
+
 	// 이벤트 선택 대기 중이면 시뮬레이션 일시정지
 	if (!waitingForChoice) {
 		world->Update(deltaTime);
@@ -865,7 +870,7 @@ void GameScene::DisplayDayStart()
 	std::println("  ╔════════════════════════════════════════════════╗");
 	std::println("  ║  2156년 {:>2}월 {:>2}일                      Day {:>3} ║", month, dayOfMonth, totalDay);
 	std::println("  ╠════════════════════════════════════════════════╣");
-	std::println("  ║  [현재 위치] {:<12} (인원: {:>3}명)         ║", regionName, regionPopulation);
+	std::println("  ║  [현재 위치] {:<12} (인원: {:>3}명)        ║", regionName, regionPopulation);
 	std::println("  ╠════════════════════════════════════════════════╣");
 	std::println("  ║  [도시 상태]             [시민 상태]           ║");
 	std::println("  ║  > 분위기: {:<8}     > 인구: {:>4}명         ║", moodText, population);
@@ -1346,36 +1351,23 @@ void GameScene::DisplayMoveMenu()
 {
 	if (!world) return;
 
-	system("cls");
-
 	Region currentRegion = world->GetPlayerRegion();
 	std::vector<Region> adjacent = world->GetAccessibleRegions();
 
+	// 대사 출력 하단에 인라인으로 이동 메뉴 표시
 	std::println("");
-	std::println("  ╔════════════════════════════════════════════════╗");
-	std::println("  ║                   [구역 이동]                   ║");
-	std::println("  ╠════════════════════════════════════════════════╣");
-	std::println("  ║  현재 위치: {:<12}                       ║", GetRegionName(currentRegion));
-	std::println("  ╠════════════════════════════════════════════════╣");
-	std::println("  ║  이동 가능한 구역:                             ║");
+	std::println("  ──────────────── [구역 이동] ────────────────");
+	std::print("  이동 가능: ");
 
 	for (size_t i = 0; i < adjacent.size(); ++i) {
 		Region r = adjacent[i];
-		std::string icon = world->HasUnseenEventInRegion(r) ? " !" : "";
-		int population = world->GetHumanCountInRegion(r);
-		std::println("  ║    {}. {:<14} (인원: {:>3}명){}         ║",
-			i + 1, GetRegionName(r), population, icon);
+		std::string icon = world->HasUnseenEventInRegion(r) ? "!" : "";
+		if (i > 0) std::print(" | ");
+		std::print("[{}]{}{}", i + 1, GetRegionName(r), icon);
 	}
-
-	// 빈 줄 채우기 (최대 5개 선택지 기준)
-	for (size_t i = adjacent.size(); i < 5; ++i) {
-		std::println("  ║                                                ║");
-	}
-
-	std::println("  ╠════════════════════════════════════════════════╣");
-	std::println("  ║  ! : 미확인 이벤트가 있는 구역                  ║");
-	std::println("  ╚════════════════════════════════════════════════╝");
-	std::println("    숫자 키로 이동, ESC로 취소");
+	std::println("");
+	std::println("  숫자 키로 이동, ESC로 취소");
+	std::print("  > ");
 }
 
 void GameScene::HandleRegionMove(char input)
@@ -1384,11 +1376,7 @@ void GameScene::HandleRegionMove(char input)
 
 	if (input == 27) {  // ESC
 		showingMoveMenu = false;
-		system("cls");
-		DisplayDayStart();
-		for (const auto& d : dayLog) {
-			std::println("    \"{}\"", d);
-		}
+		std::println("\n  이동을 취소했습니다.");
 		return;
 	}
 
@@ -1406,17 +1394,15 @@ void GameScene::HandleRegionMove(char input)
 				em->ProcessPendingRegionEvents(static_cast<int>(targetRegion), *world->GetCity(), world->GetHumansVector());
 			}
 
-			// 이동 메시지 추가
+			// 이동 메시지 출력
+			std::println("\n  >> {} 구역으로 이동했습니다.", GetRegionName(targetRegion));
+
+			// 이동 메시지 로그 추가
 			std::string moveLog = std::format("[이동] {} 구역으로 이동했습니다.", GetRegionName(targetRegion));
 			dayLog.push_back(moveLog);
 		}
 
 		showingMoveMenu = false;
-		system("cls");
-		DisplayDayStart();
-		for (const auto& d : dayLog) {
-			std::println("    \"{}\"", d);
-		}
 	}
 }
 

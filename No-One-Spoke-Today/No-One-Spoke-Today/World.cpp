@@ -1,4 +1,5 @@
 #include "World.h"
+#include "Toolkit.h"
 #include "data.h"
 
 #define humansNum 200
@@ -7,9 +8,47 @@
 World::World()
 {
 	humans.reserve(humansNum + tempNum);
+
+	// 이름 파일 로드
+	std::vector<std::string> maleNames = loadSentences("data/names_male.txt");
+	std::vector<std::string> femaleNames = loadSentences("data/names_female.txt");
+
+	// 이름 셔플
+	std::random_device rd;
+	std::default_random_engine rng(rd());
+	std::shuffle(maleNames.begin(), maleNames.end(), rng);
+	std::shuffle(femaleNames.begin(), femaleNames.end(), rng);
+
+	int maleIdx = 0;
+	int femaleIdx = 0;
+
 	for (size_t i = 0; i < humansNum; ++i)
 	{
 		humans.emplace_back(std::make_unique<Human>());
+
+		// 성별 랜덤 배정 (약 50:50)
+		bool isMale = (rng() % 2 == 0);
+		humans[i]->SetMale(isMale);
+
+		// 이름 배정 (겹치지 않도록)
+		if (isMale && maleIdx < static_cast<int>(maleNames.size())) {
+			humans[i]->SetName(maleNames[maleIdx++]);
+		}
+		else if (!isMale && femaleIdx < static_cast<int>(femaleNames.size())) {
+			humans[i]->SetName(femaleNames[femaleIdx++]);
+		}
+		else {
+			// 이름이 부족하면 반대 성별에서 가져오거나 기본 이름
+			if (isMale && femaleIdx < static_cast<int>(femaleNames.size())) {
+				humans[i]->SetName(femaleNames[femaleIdx++]);
+			}
+			else if (!isMale && maleIdx < static_cast<int>(maleNames.size())) {
+				humans[i]->SetName(maleNames[maleIdx++]);
+			}
+			else {
+				humans[i]->SetName("시민" + std::to_string(i));
+			}
+		}
 	}
 
 	// 구역별 인구 배정
