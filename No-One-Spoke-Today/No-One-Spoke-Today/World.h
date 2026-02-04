@@ -68,5 +68,17 @@ private:
 	Region playerRegion{ Region::Cockpit };
 	std::vector<std::pair<Region, std::string>> regionEventAlerts;
 	std::set<Region> unseenEventRegions;
+
+	// 하부구동부 지시 관리
+	int angleOrderCountToday{ 0 };		// 오늘 각도 지시 횟수
+	int lastAngleOrderDay{ -1 };		// 마지막 지시한 날
+
+public:
+	// 하부구동부 지시 관련
+	int GetAngleOrderCountToday() const { return angleOrderCountToday; }
+	void SetAngleOrderCountToday(int count) { angleOrderCountToday = count; }
+	void SetLastAngleOrderDay(int day) { lastAngleOrderDay = day; }
+	void IncrementAngleOrderCount();
+	void ResetAngleOrderCountIfNewDay();
 };
 

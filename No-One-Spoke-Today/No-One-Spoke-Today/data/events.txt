@@ -6959,3 +6959,1018 @@ choice_3_text     = 이름 없이도 괜찮다고 결정한다
 choice_3_effect   = ModifyDrive, SenseOfControl, 200, AllHumans
 choice_3_effect   = ModifyCityMetric, Activity, 100, City
 [EVENT_END]
+
+
+################################################################################
+#                    LOWER DRIVE (하부구동부 관련 이벤트)
+################################################################################
+
+[EVENT_START]
+id                = lowerdrive_fatigue_001
+name              = 하부구동부 피로 누적
+category          = Social
+description       = 하부구동부 작업자들의 피로가 한계에 다다르고 있습니다. 잦은 각도 조정 지시로 인해 작업자들이 지쳐가고 있습니다.
+
+trigger_type      = condition
+city_mask         = 0x0000
+human_mask        = 0x000000000001C000
+human_min         = 0x000000000000C000
+human_max         = 0x000000000001C000
+min_human_count   = 3
+region_id         = 5
+
+cooldown_min      = 3
+cooldown_max      = 7
+
+effect_scope      = Region
+effect_region_id  = 5
+requires_player   = true
+
+choice_1_text     = 휴식 시간을 주겠다
+choice_1_effect   = ModifyDrive, Fatigue, -500, Region
+choice_1_effect   = ModifyDrive, Motivation, 200, Region
+choice_1_effect   = ModifyDrive, InterpersonalTrust, 300, Region
+
+choice_2_text     = 조금만 더 버텨달라
+choice_2_effect   = ModifyDrive, Fatigue, 200, Region
+choice_2_effect   = ModifyDrive, StressLoad, 300, Region
+choice_2_effect   = ModifyDrive, InterpersonalTrust, -200, Region
+[EVENT_END]
+
+[EVENT_START]
+id                = lowerdrive_complaint_001
+name              = 하부구동부 불만 표출
+category          = Social
+description       = 하부구동부 작업자들이 잦은 지시 변경에 불만을 표출하고 있습니다. "계산을 제대로 하고 지시하시는 겁니까?"라는 목소리가 들려옵니다.
+
+trigger_type      = condition
+city_mask         = 0x0000
+human_mask        = 0x0000000000000700
+human_min         = 0x0000000000000500
+human_max         = 0x0000000000000700
+min_human_count   = 2
+region_id         = 5
+
+cooldown_min      = 2
+cooldown_max      = 5
+
+effect_scope      = Region
+effect_region_id  = 5
+requires_player   = true
+
+choice_1_text     = 미안하다, 계산이 잘못됐었다
+choice_1_effect   = ModifyDrive, StressLoad, -200, Region
+choice_1_effect   = ModifyDrive, InterpersonalTrust, 100, Region
+choice_1_effect   = ModifyDrive, SocialSafety, 100, Region
+
+choice_2_text     = 명령이다. 따르라
+choice_2_effect   = ModifyDrive, StressLoad, 500, Region
+choice_2_effect   = ModifyDrive, SenseOfControl, -300, Region
+choice_2_effect   = ModifyDrive, InterpersonalTrust, -400, Region
+
+choice_3_text     = 보상을 약속하겠다
+choice_3_effect   = ModifyDrive, Motivation, 300, Region
+choice_3_effect   = ModifyDrive, StressLoad, -100, Region
+choice_3_effect   = ModifyDrive, InterpersonalTrust, 200, Region
+[EVENT_END]
+
+[EVENT_START]
+id                = lowerdrive_rebellion_001
+name              = 작업자 반발
+category          = Interpersonal
+description       = 하부구동부의 한 작업자가 당신의 지시에 공개적으로 반발하고 있습니다. "이렇게 막 부려먹으면 어떡합니까! 우리도 사람입니다!"
+
+trigger_type      = condition
+city_mask         = 0x0000
+human_mask        = 0x0000000E00000700
+human_min         = 0x0000000800000500
+human_max         = 0x0000000E00000700
+min_human_count   = 1
+region_id         = 5
+
+cooldown_min      = 5
+cooldown_max      = 10
+
+effect_scope      = Region
+effect_region_id  = 5
+requires_player   = true
+
+choice_1_text     = 이유를 들어보겠다
+choice_1_effect   = ModifyDrive, StressLoad, -300, Triggered
+choice_1_effect   = ModifyDrive, SocialSafety, 200, Triggered
+choice_1_effect   = ModifyDrive, InterpersonalTrust, 300, Triggered
+
+choice_2_text     = 지금은 따르라, 나중에 이야기하자
+choice_2_effect   = ModifyDrive, StressLoad, 100, Triggered
+choice_2_effect   = ModifyDrive, SenseOfControl, -100, Triggered
+
+choice_3_text     = 반항하면 불이익이 있을 것이다
+choice_3_effect   = ModifyDrive, SenseOfControl, -500, Triggered
+choice_3_effect   = ModifyDrive, InterpersonalTrust, -600, Triggered
+choice_3_effect   = ModifyDrive, StressLoad, 800, Triggered
+[EVENT_END]
+
+[EVENT_START]
+id                = lowerdrive_slowdown_001
+name              = 작업 태업
+category          = Social
+description       = 하부구동부 작업자들이 태업에 들어갔습니다. 극심한 피로와 의욕 저하로 인해 각도 조정 작업이 크게 지연되고 있습니다.
+
+trigger_type      = condition
+city_mask         = 0x0000
+human_mask        = 0x00000000E001C000
+human_min         = 0x000000000000C000
+human_max         = 0x000000002001C000
+min_human_count   = 2
+region_id         = 5
+
+cooldown_min      = 7
+cooldown_max      = 14
+
+effect_scope      = Region
+effect_region_id  = 5
+requires_player   = true
+
+choice_1_text     = 강제로라도 움직이게 하라
+choice_1_effect   = ModifyDrive, StressLoad, 800, Region
+choice_1_effect   = ModifyDrive, Fatigue, 500, Region
+choice_1_effect   = ModifyDrive, InterpersonalTrust, -800, Region
+choice_1_effect   = ModifyDrive, SenseOfControl, -400, Region
+
+choice_2_text     = 오늘은 쉬게 하라
+choice_2_effect   = ModifyDrive, Fatigue, -1000, Region
+choice_2_effect   = ModifyDrive, Motivation, 500, Region
+choice_2_effect   = ModifyDrive, StressLoad, -400, Region
+choice_2_effect   = ModifyDrive, InterpersonalTrust, 400, Region
+[EVENT_END]
+
+[EVENT_START]
+id                = lowerdrive_advice_001
+name              = 숙련공의 조언
+category          = Interpersonal
+description       = 하부구동부의 숙련된 작업자가 조심스럽게 당신에게 다가옵니다. "말씀드려도 될까요... 한 번에 제대로 계산해서 오시면 저희도 편하고, 도시 전체에도 좋을 것 같습니다."
+
+trigger_type      = condition
+city_mask         = 0x0000
+human_mask        = 0x0000007700000000
+human_min         = 0x0000004400000000
+human_max         = 0x0000007700000000
+min_human_count   = 1
+region_id         = 5
+
+cooldown_min      = 10
+cooldown_max      = 20
+
+effect_scope      = Triggered
+requires_player   = true
+
+choice_1_text     = 조언 감사하다, 노력하겠다
+choice_1_effect   = ModifyDrive, InterpersonalTrust, 200, Triggered
+choice_1_effect   = ModifyDrive, Motivation, 100, Triggered
+choice_1_effect   = ModifyDrive, SocialSafety, 100, Region
+
+choice_2_text     = 내가 알아서 한다
+choice_2_effect   = ModifyDrive, InterpersonalTrust, -200, Triggered
+choice_2_effect   = ModifyDrive, SenseOfControl, -100, Triggered
+[EVENT_END]
+
+
+################################################################################
+#                    CANTEEN (식당 관련 이벤트) - Region 2
+################################################################################
+
+[EVENT_START]
+id                = canteen_food_shortage_001
+name              = 식량 배급 지연
+category          = Social
+description       = 식당에서 배급이 지연되고 있습니다. 줄이 길어지면서 시민들 사이에 불만이 커지고 있습니다.
+
+trigger_type      = condition
+city_mask         = 0x0E00
+city_min          = 0x0600
+city_max          = 0x0E00
+human_mask        = 0x0
+min_human_count   = 0
+region_id         = 2
+
+cooldown_min      = 4
+cooldown_max      = 8
+
+effect_scope      = Region
+effect_region_id  = 2
+requires_player   = true
+
+choice_1_text     = 배급량을 줄여서라도 빠르게 나눠준다
+choice_1_effect   = ModifyDrive, StressLoad, -200, Region
+choice_1_effect   = ModifyCityMetric, Scarcity, 300, City
+choice_1_effect   = ModifyDrive, SocialSafety, 100, Region
+
+choice_2_text     = 질서를 유지하며 기다리게 한다
+choice_2_effect   = ModifyDrive, StressLoad, 300, Region
+choice_2_effect   = ModifyDrive, SenseOfControl, -100, Region
+
+choice_3_text     = 추가 인력을 투입한다
+choice_3_effect   = ModifyDrive, Fatigue, 200, AllHumans
+choice_3_effect   = ModifyDrive, StressLoad, -300, Region
+choice_3_effect   = ModifyCityMetric, Activity, 200, City
+[EVENT_END]
+
+[EVENT_START]
+id                = canteen_fight_001
+name              = 식당 다툼
+category          = Interpersonal
+description       = 식당에서 두 시민이 심하게 다투고 있습니다. 배급 순서를 두고 시작된 말다툼이 몸싸움으로 번지려 합니다.
+
+trigger_type      = condition
+city_mask         = 0x0000
+human_mask        = 0x0000000E00000700
+human_min         = 0x0000000600000400
+human_max         = 0x0000000E00000700
+min_human_count   = 2
+region_id         = 2
+
+cooldown_min      = 5
+cooldown_max      = 12
+
+effect_scope      = Region
+effect_region_id  = 2
+requires_player   = true
+
+choice_1_text     = 직접 중재에 나선다
+choice_1_effect   = ModifyDrive, StressLoad, -400, Triggered
+choice_1_effect   = ModifyDrive, InterpersonalTrust, 200, Region
+choice_1_effect   = ModifyDrive, SocialSafety, 200, Region
+
+choice_2_text     = 둘 다 오늘 배급에서 제외한다
+choice_2_effect   = ModifyDrive, StressLoad, 500, Triggered
+choice_2_effect   = ModifyDrive, SenseOfControl, -300, Triggered
+choice_2_effect   = ModifyDrive, SocialSafety, 100, Region
+
+choice_3_text     = 지켜만 본다
+choice_3_effect   = ModifyDrive, StressLoad, 200, Region
+choice_3_effect   = ModifyDrive, SocialSafety, -300, Region
+choice_3_effect   = ModifyDrive, InterpersonalTrust, -200, Region
+[EVENT_END]
+
+
+################################################################################
+#                VERTICAL FARM (수직농장 관련 이벤트) - Region 4
+################################################################################
+
+[EVENT_START]
+id                = farm_pest_001
+name              = 해충 발생
+category          = Environment
+description       = 수직농장에 해충이 발생했습니다. 빠르게 대처하지 않으면 작물 피해가 커질 것입니다.
+
+trigger_type      = random
+city_mask         = 0x0000
+human_mask        = 0x0
+min_human_count   = 0
+region_id         = 4
+
+cooldown_min      = 10
+cooldown_max      = 20
+
+effect_scope      = AllHumans
+effect_region_id  = 4
+requires_player   = true
+
+choice_1_text     = 감염된 구역을 격리하고 작물을 폐기한다
+choice_1_effect   = ModifyCityMetric, Scarcity, 500, City
+choice_1_effect   = ModifyDrive, SocialSafety, 200, AllHumans
+choice_1_effect   = ModifyDrive, StressLoad, 200, AllHumans
+
+choice_2_text     = 살충제를 대량 살포한다
+choice_2_effect   = ModifyDrive, Fatigue, 300, Region
+choice_2_effect   = ModifyCityMetric, Scarcity, 200, City
+choice_2_effect   = ModifyDrive, StressLoad, 100, AllHumans
+
+choice_3_text     = 수작업으로 해충을 제거한다
+choice_3_effect   = ModifyDrive, Fatigue, 600, Region
+choice_3_effect   = ModifyDrive, StressLoad, 300, Region
+choice_3_effect   = ModifyDrive, Motivation, -200, Region
+[EVENT_END]
+
+[EVENT_START]
+id                = farm_harvest_001
+name              = 풍성한 수확
+category          = Environment
+description       = 수직농장에서 예상보다 풍성한 수확이 이뤄졌습니다. 시민들 사이에 희망의 분위기가 돕니다.
+
+trigger_type      = condition
+city_mask         = 0x0038
+city_min          = 0x0018
+city_max          = 0x0038
+human_mask        = 0x0
+min_human_count   = 0
+region_id         = 4
+
+cooldown_min      = 15
+cooldown_max      = 25
+
+effect_scope      = AllHumans
+requires_player   = false
+
+immediate_effect  = ModifyCityMetric, Scarcity, -400, City
+immediate_effect  = ModifyDrive, Motivation, 300, AllHumans
+immediate_effect  = ModifyCityMetric, Mood, 300, City
+[EVENT_END]
+
+
+################################################################################
+#            RECYCLING PLANT (순환정제소 관련 이벤트) - Region 3
+################################################################################
+
+[EVENT_START]
+id                = recycle_contamination_001
+name              = 정수 시스템 오염
+category          = Environment
+description       = 순환정제소의 정수 시스템에 오염이 감지되었습니다. 즉각적인 조치가 필요합니다.
+
+trigger_type      = random
+city_mask         = 0x0000
+human_mask        = 0x0
+min_human_count   = 0
+region_id         = 3
+
+cooldown_min      = 12
+cooldown_max      = 20
+
+effect_scope      = AllHumans
+effect_region_id  = 3
+requires_player   = true
+
+choice_1_text     = 정제소를 일시 폐쇄하고 전면 점검한다
+choice_1_effect   = ModifyCityMetric, Scarcity, 600, City
+choice_1_effect   = ModifyDrive, SocialSafety, 400, AllHumans
+choice_1_effect   = ModifyDrive, Fatigue, 400, Region
+
+choice_2_text     = 오염된 부분만 우회하여 운영한다
+choice_2_effect   = ModifyCityMetric, Scarcity, 200, City
+choice_2_effect   = ModifyDrive, StressLoad, 300, AllHumans
+choice_2_effect   = ModifyDrive, SocialSafety, -200, AllHumans
+
+choice_3_text     = 배급량을 줄이고 비축분으로 버틴다
+choice_3_effect   = ModifyCityMetric, Scarcity, 400, City
+choice_3_effect   = ModifyDrive, StressLoad, 200, AllHumans
+choice_3_effect   = ModifyDrive, Motivation, -100, AllHumans
+[EVENT_END]
+
+[EVENT_START]
+id                = recycle_efficiency_001
+name              = 정제 효율 개선
+category          = Social
+description       = 순환정제소 작업자들이 새로운 정제 방식을 제안했습니다.
+
+trigger_type      = condition
+city_mask         = 0x0000
+human_mask        = 0x0000007700000000
+human_min         = 0x0000004400000000
+human_max         = 0x0000007700000000
+min_human_count   = 1
+region_id         = 3
+
+cooldown_min      = 20
+cooldown_max      = 35
+
+effect_scope      = Region
+effect_region_id  = 3
+requires_player   = true
+
+choice_1_text     = 새 방식을 도입한다
+choice_1_effect   = ModifyCityMetric, Scarcity, -300, City
+choice_1_effect   = ModifyDrive, Motivation, 400, Triggered
+choice_1_effect   = ModifyDrive, InterpersonalTrust, 300, Triggered
+
+choice_2_text     = 기존 방식을 유지한다
+choice_2_effect   = ModifyDrive, Motivation, -200, Triggered
+choice_2_effect   = ModifyDrive, InterpersonalTrust, -100, Triggered
+[EVENT_END]
+
+
+################################################################################
+#        OUTER WALL MAINTENANCE (외벽정비구역 관련 이벤트) - Region 1
+################################################################################
+
+[EVENT_START]
+id                = outerwall_breach_001
+name              = 외벽 균열 발견
+category          = Environment
+description       = 외벽 정비 중 심각한 균열이 발견되었습니다. 방치하면 더 큰 피해로 이어질 수 있습니다.
+
+trigger_type      = random
+city_mask         = 0x0000
+human_mask        = 0x0
+min_human_count   = 0
+region_id         = 1
+
+cooldown_min      = 8
+cooldown_max      = 15
+
+effect_scope      = AllHumans
+effect_region_id  = 1
+requires_player   = true
+
+choice_1_text     = 즉시 수리 작업에 돌입한다
+choice_1_effect   = ModifyDrive, Fatigue, 500, Region
+choice_1_effect   = ModifyDrive, StressLoad, 200, Region
+choice_1_effect   = ModifyDrive, SocialSafety, 300, AllHumans
+
+choice_2_text     = 임시 보강만 하고 나중에 본격 수리한다
+choice_2_effect   = ModifyDrive, Fatigue, 200, Region
+choice_2_effect   = ModifyDrive, SocialSafety, -200, AllHumans
+choice_2_effect   = ModifyDrive, StressLoad, 100, AllHumans
+
+choice_3_text     = 해당 구역을 폐쇄하고 우회로를 만든다
+choice_3_effect   = ModifyCityMetric, Activity, -300, City
+choice_3_effect   = ModifyDrive, SocialSafety, 100, AllHumans
+[EVENT_END]
+
+[EVENT_START]
+id                = outerwall_danger_001
+name              = 외벽 작업 중 사고
+category          = Personal
+description       = 외벽 정비 작업 중 한 작업자가 추락 위험에 처했습니다.
+
+trigger_type      = condition
+city_mask         = 0x0000
+human_mask        = 0x000000000001C000
+human_min         = 0x000000000000C000
+human_max         = 0x000000000001C000
+min_human_count   = 1
+region_id         = 1
+
+cooldown_min      = 10
+cooldown_max      = 20
+
+effect_scope      = Region
+effect_region_id  = 1
+requires_player   = true
+
+choice_1_text     = 직접 구조에 나선다
+choice_1_effect   = ModifyDrive, InterpersonalTrust, 500, Triggered
+choice_1_effect   = ModifyDrive, SocialSafety, 300, Region
+choice_1_effect   = ModifyDrive, StressLoad, -300, Triggered
+
+choice_2_text     = 구조 팀을 보낸다
+choice_2_effect   = ModifyDrive, StressLoad, 200, Triggered
+choice_2_effect   = ModifyDrive, SocialSafety, 100, Region
+
+choice_3_text     = 안전 우선, 스스로 내려오게 한다
+choice_3_effect   = ModifyDrive, StressLoad, 400, Triggered
+choice_3_effect   = ModifyDrive, InterpersonalTrust, -300, Triggered
+choice_3_effect   = ModifyDrive, SenseOfControl, 200, Triggered
+[EVENT_END]
+
+
+################################################################################
+#          CENTRAL POWERWAY (중앙동력로 관련 이벤트) - Region 6
+################################################################################
+
+[EVENT_START]
+id                = powerway_overload_001
+name              = 동력 과부하
+category          = Environment
+description       = 중앙동력로에 과부하 경고가 발생했습니다. 엔진 출력을 조절해야 합니다.
+
+trigger_type      = random
+city_mask         = 0x0000
+human_mask        = 0x0
+min_human_count   = 0
+region_id         = 6
+
+cooldown_min      = 6
+cooldown_max      = 12
+
+effect_scope      = AllHumans
+effect_region_id  = 6
+requires_player   = true
+
+choice_1_text     = 출력을 낮추고 속도를 줄인다
+choice_1_effect   = ModifyDrive, SocialSafety, 200, AllHumans
+choice_1_effect   = ModifyDrive, StressLoad, 100, AllHumans
+
+choice_2_text     = 현재 출력을 유지한다 (위험 감수)
+choice_2_effect   = ModifyDrive, StressLoad, 400, AllHumans
+choice_2_effect   = ModifyDrive, SocialSafety, -300, AllHumans
+
+choice_3_text     = 비상 냉각 시스템을 가동한다
+choice_3_effect   = ModifyCityMetric, Scarcity, 300, City
+choice_3_effect   = ModifyDrive, SocialSafety, 300, AllHumans
+choice_3_effect   = ModifyDrive, Fatigue, 200, Region
+[EVENT_END]
+
+[EVENT_START]
+id                = powerway_sabotage_001
+name              = 동력로 파손 의혹
+category          = Interpersonal
+description       = 중앙동력로에서 의도적인 파손 흔적이 발견되었습니다. 누군가 고의로 손상을 입힌 것 같습니다.
+
+trigger_type      = condition
+city_mask         = 0x0038
+city_min          = 0x0000
+city_max          = 0x0010
+human_mask        = 0x0000000000000003
+human_min         = 0x0000000000000002
+human_max         = 0x0000000000000003
+min_human_count   = 3
+region_id         = 6
+
+cooldown_min      = 20
+cooldown_max      = 40
+
+effect_scope      = AllHumans
+requires_player   = true
+
+choice_1_text     = 범인을 찾기 위해 조사를 시작한다
+choice_1_effect   = ModifyDrive, StressLoad, 300, AllHumans
+choice_1_effect   = ModifyDrive, SocialSafety, -200, AllHumans
+choice_1_effect   = ModifyDrive, InterpersonalTrust, -300, AllHumans
+
+choice_2_text     = 경계를 강화하고 넘어간다
+choice_2_effect   = ModifyDrive, SenseOfControl, -200, AllHumans
+choice_2_effect   = ModifyDrive, StressLoad, 100, AllHumans
+
+choice_3_text     = 전체 시민에게 경고 메시지를 발표한다
+choice_3_effect   = ModifyDrive, SocialSafety, -100, AllHumans
+choice_3_effect   = ModifyDrive, SenseOfControl, 100, AllHumans
+choice_3_effect   = ModifyDrive, Motivation, -100, AllHumans
+[EVENT_END]
+
+
+################################################################################
+#        RESIDENTIAL AREAS (거주구역 관련 이벤트) - Region 7, 8
+################################################################################
+
+[EVENT_START]
+id                = residential_dispute_001
+name              = 거주구역 영역 분쟁
+category          = Social
+description       = 거주구역1과 거주구역2 주민들 사이에 공용 공간을 둘러싼 갈등이 발생했습니다.
+
+trigger_type      = condition
+city_mask         = 0x0038
+city_min          = 0x0000
+city_max          = 0x0018
+human_mask        = 0x0000000000000700
+human_min         = 0x0000000000000400
+human_max         = 0x0000000000000700
+min_human_count   = 5
+
+cooldown_min      = 10
+cooldown_max      = 18
+
+effect_scope      = AllHumans
+requires_player   = true
+
+choice_1_text     = 공용 공간 사용 규칙을 새로 정한다
+choice_1_effect   = ModifyDrive, StressLoad, -200, AllHumans
+choice_1_effect   = ModifyDrive, SenseOfControl, 200, AllHumans
+choice_1_effect   = ModifyDrive, InterpersonalTrust, 100, AllHumans
+
+choice_2_text     = 거주구역1에 우선권을 준다
+choice_2_effect   = ModifyDrive, StressLoad, -300, Region
+choice_2_effect   = ModifyDrive, InterpersonalTrust, -400, AllHumans
+choice_2_effect   = ModifyDrive, SocialSafety, -200, AllHumans
+
+choice_3_text     = 양측 대표를 모아 협상하게 한다
+choice_3_effect   = ModifyDrive, InterpersonalTrust, 200, AllHumans
+choice_3_effect   = ModifyDrive, StressLoad, 100, AllHumans
+choice_3_effect   = ModifyCityMetric, Mood, 100, City
+[EVENT_END]
+
+[EVENT_START]
+id                = residential_violence_001
+name              = 거주구역 폭력 사태
+category          = Interpersonal
+description       = 거주구역에서 심각한 폭력 사태가 발생했습니다. 한 시민이 다른 시민을 심하게 다치게 했습니다.
+
+trigger_type      = condition
+city_mask         = 0x0000
+human_mask        = 0x0000000E00000003
+human_min         = 0x0000000800000003
+human_max         = 0x0000000E00000003
+min_human_count   = 1
+
+cooldown_min      = 15
+cooldown_max      = 30
+
+effect_scope      = AllHumans
+requires_player   = true
+
+choice_1_text     = 가해자를 격리하고 처벌한다
+choice_1_effect   = ModifyDrive, SenseOfControl, -500, Triggered
+choice_1_effect   = ModifyDrive, SocialSafety, 300, AllHumans
+choice_1_effect   = ModifyDrive, InterpersonalTrust, -200, Triggered
+
+choice_2_text     = 원인을 파악하고 화해를 시도한다
+choice_2_effect   = ModifyDrive, StressLoad, -200, Triggered
+choice_2_effect   = ModifyDrive, InterpersonalTrust, 200, Triggered
+choice_2_effect   = ModifyDrive, SocialSafety, -100, AllHumans
+
+choice_3_text     = 피해자 치료에 집중하고 나머지는 나중에 처리한다
+choice_3_effect   = ModifyDrive, SocialSafety, -200, AllHumans
+choice_3_effect   = ModifyDrive, InterpersonalTrust, 100, Triggered
+[EVENT_END]
+
+[EVENT_START]
+id                = residential_migration_001
+name              = 자발적 구역 이동
+category          = Social
+description       = 일부 시민들이 다른 구역으로 이주하고 싶다고 요청했습니다.
+
+trigger_type      = condition
+city_mask         = 0x0000
+human_mask        = 0x0000000000000700
+human_min         = 0x0000000000000300
+human_max         = 0x0000000000000700
+min_human_count   = 3
+
+cooldown_min      = 12
+cooldown_max      = 25
+
+effect_scope      = Triggered
+requires_player   = true
+
+choice_1_text     = 이주를 허락한다
+choice_1_effect   = ModifyDrive, StressLoad, -400, Triggered
+choice_1_effect   = ModifyDrive, Motivation, 300, Triggered
+choice_1_effect   = ModifyDrive, SenseOfControl, 300, Triggered
+
+choice_2_text     = 현재 배치를 유지한다
+choice_2_effect   = ModifyDrive, StressLoad, 200, Triggered
+choice_2_effect   = ModifyDrive, SenseOfControl, -200, Triggered
+choice_2_effect   = ModifyDrive, Motivation, -100, Triggered
+
+choice_3_text     = 이유를 듣고 부분적으로 허락한다
+choice_3_effect   = ModifyDrive, StressLoad, -100, Triggered
+choice_3_effect   = ModifyDrive, InterpersonalTrust, 200, Triggered
+[EVENT_END]
+
+
+################################################################################
+#                    COCKPIT (조타실 관련 이벤트) - Region 0
+################################################################################
+
+[EVENT_START]
+id                = cockpit_decision_001
+name              = 중대 결정의 순간
+category          = CityWide
+description       = 도시의 미래를 결정할 중요한 선택이 필요합니다. 모든 시민들이 당신의 결정을 기다리고 있습니다.
+
+trigger_type      = random
+city_mask         = 0x0000
+human_mask        = 0x0
+min_human_count   = 0
+region_id         = 0
+
+cooldown_min      = 30
+cooldown_max      = 50
+
+effect_scope      = AllHumans
+requires_player   = true
+
+choice_1_text     = 안전을 최우선으로 한다
+choice_1_effect   = ModifyDrive, SocialSafety, 400, AllHumans
+choice_1_effect   = ModifyDrive, Motivation, -100, AllHumans
+choice_1_effect   = ModifyCityMetric, Activity, -200, City
+
+choice_2_text     = 발전과 확장을 추구한다
+choice_2_effect   = ModifyDrive, Motivation, 300, AllHumans
+choice_2_effect   = ModifyDrive, SocialSafety, -200, AllHumans
+choice_2_effect   = ModifyCityMetric, Activity, 300, City
+
+choice_3_text     = 시민들의 의견을 수렴한다
+choice_3_effect   = ModifyDrive, InterpersonalTrust, 300, AllHumans
+choice_3_effect   = ModifyDrive, SenseOfControl, 200, AllHumans
+choice_3_effect   = ModifyDrive, StressLoad, 100, AllHumans
+[EVENT_END]
+
+
+################################################################################
+#              NAVIGATION (외부 지역/항행 관련 이벤트)
+################################################################################
+
+[EVENT_START]
+id                = nav_unknown_signal_001
+name              = 미확인 신호 감지
+category          = Environment
+description       = 조타실에서 미확인 신호를 감지했습니다. 다른 이동 도시이거나 위험 신호일 수 있습니다.
+
+trigger_type      = random
+city_mask         = 0x0000
+human_mask        = 0x0
+min_human_count   = 0
+region_id         = 0
+
+cooldown_min      = 15
+cooldown_max      = 30
+
+effect_scope      = AllHumans
+requires_player   = true
+
+choice_1_text     = 신호 방향으로 접근한다
+choice_1_effect   = ModifyDrive, StressLoad, 200, AllHumans
+choice_1_effect   = ModifyDrive, Motivation, 200, AllHumans
+
+choice_2_text     = 신호를 무시하고 현재 경로를 유지한다
+choice_2_effect   = ModifyDrive, SenseOfControl, 100, AllHumans
+
+choice_3_text     = 응답 신호를 보내고 대기한다
+choice_3_effect   = ModifyDrive, StressLoad, 300, AllHumans
+choice_3_effect   = ModifyDrive, SocialSafety, -100, AllHumans
+choice_3_effect   = ModifyDrive, InterpersonalTrust, 100, AllHumans
+[EVENT_END]
+
+[EVENT_START]
+id                = nav_terrain_danger_001
+name              = 위험 지형 경고
+category          = Environment
+description       = 현재 진행 방향에 위험한 지형이 감지되었습니다. 우회할지 돌파할지 결정해야 합니다.
+
+trigger_type      = random
+city_mask         = 0x0000
+human_mask        = 0x0
+min_human_count   = 0
+region_id         = 0
+
+cooldown_min      = 8
+cooldown_max      = 15
+
+effect_scope      = AllHumans
+requires_player   = true
+
+choice_1_text     = 우회 경로를 찾는다
+choice_1_effect   = ModifyDrive, SocialSafety, 200, AllHumans
+choice_1_effect   = ModifyDrive, Fatigue, 200, AllHumans
+
+choice_2_text     = 조심스럽게 통과한다
+choice_2_effect   = ModifyDrive, StressLoad, 400, AllHumans
+choice_2_effect   = ModifyDrive, SocialSafety, -200, AllHumans
+choice_2_effect   = ModifyDrive, Fatigue, 300, AllHumans
+
+choice_3_text     = 도시를 정지시키고 지형을 조사한다
+choice_3_effect   = ModifyDrive, StressLoad, 100, AllHumans
+choice_3_effect   = ModifyDrive, Fatigue, 400, AllHumans
+choice_3_effect   = ModifyDrive, CognitiveCapacity, 200, AllHumans
+[EVENT_END]
+
+[EVENT_START]
+id                = nav_resource_found_001
+name              = 자원 발견
+category          = Environment
+description       = 항행 중 유용한 자원을 발견했습니다. 수거하려면 시간과 인력이 필요합니다.
+
+trigger_type      = random
+city_mask         = 0x0000
+human_mask        = 0x0
+min_human_count   = 0
+
+cooldown_min      = 10
+cooldown_max      = 20
+
+effect_scope      = AllHumans
+requires_player   = true
+
+choice_1_text     = 멈추고 자원을 수거한다
+choice_1_effect   = ModifyCityMetric, Scarcity, -500, City
+choice_1_effect   = ModifyDrive, Fatigue, 300, AllHumans
+choice_1_effect   = ModifyDrive, Motivation, 200, AllHumans
+
+choice_2_text     = 위치만 기록하고 지나간다
+choice_2_effect   = ModifyDrive, Motivation, -100, AllHumans
+
+choice_3_text     = 소규모 팀만 보내 빠르게 수거한다
+choice_3_effect   = ModifyCityMetric, Scarcity, -200, City
+choice_3_effect   = ModifyDrive, Fatigue, 500, AllHumans
+choice_3_effect   = ModifyDrive, StressLoad, 200, AllHumans
+[EVENT_END]
+
+[EVENT_START]
+id                = nav_survivor_found_001
+name              = 생존자 발견
+category          = CityWide
+description       = 항행 중 외부에서 생존자를 발견했습니다. 그들은 도시에 합류하고 싶어합니다.
+
+trigger_type      = random
+city_mask         = 0x0000
+human_mask        = 0x0
+min_human_count   = 0
+
+cooldown_min      = 25
+cooldown_max      = 45
+
+effect_scope      = AllHumans
+requires_player   = true
+
+choice_1_text     = 환영하며 받아들인다
+choice_1_effect   = ModifyCityMetric, Scarcity, 200, City
+choice_1_effect   = ModifyDrive, InterpersonalTrust, 200, AllHumans
+choice_1_effect   = ModifyCityMetric, Mood, 200, City
+choice_1_effect   = AddImmigrant, 0, 5, AllHumans
+
+choice_2_text     = 검역 후 제한적으로 받아들인다
+choice_2_effect   = ModifyCityMetric, Scarcity, 100, City
+choice_2_effect   = ModifyDrive, SocialSafety, 100, AllHumans
+choice_2_effect   = AddImmigrant, 0, 2, AllHumans
+
+choice_3_text     = 물자만 나눠주고 보낸다
+choice_3_effect   = ModifyCityMetric, Scarcity, 300, City
+choice_3_effect   = ModifyDrive, InterpersonalTrust, -200, AllHumans
+choice_3_effect   = ModifyDrive, SocialSafety, 100, AllHumans
+[EVENT_END]
+
+
+################################################################################
+#                 INTER-REGION (구역 간 이벤트)
+################################################################################
+
+[EVENT_START]
+id                = region_conflict_001
+name              = 구역 간 긴장
+category          = Social
+description       = 서로 다른 구역 작업자들 사이에 긴장감이 고조되고 있습니다. 업무 분담을 둘러싼 불만이 쌓이고 있습니다.
+
+trigger_type      = condition
+city_mask         = 0x0038
+city_min          = 0x0000
+city_max          = 0x0018
+human_mask        = 0x0000000000000700
+human_min         = 0x0000000000000400
+human_max         = 0x0000000000000700
+min_human_count   = 8
+
+cooldown_min      = 12
+cooldown_max      = 22
+
+effect_scope      = AllHumans
+requires_player   = true
+
+choice_1_text     = 업무 재분배 회의를 소집한다
+choice_1_effect   = ModifyDrive, StressLoad, -200, AllHumans
+choice_1_effect   = ModifyDrive, InterpersonalTrust, 200, AllHumans
+choice_1_effect   = ModifyDrive, SenseOfControl, 100, AllHumans
+
+choice_2_text     = 현재 체계를 고수한다
+choice_2_effect   = ModifyDrive, StressLoad, 200, AllHumans
+choice_2_effect   = ModifyDrive, SenseOfControl, -200, AllHumans
+
+choice_3_text     = 구역 간 인력 교환 프로그램을 시작한다
+choice_3_effect   = ModifyDrive, Fatigue, 200, AllHumans
+choice_3_effect   = ModifyDrive, InterpersonalTrust, 300, AllHumans
+choice_3_effect   = ModifyDrive, CognitiveCapacity, 100, AllHumans
+[EVENT_END]
+
+[EVENT_START]
+id                = region_cooperation_001
+name              = 구역 간 협력
+category          = Social
+description       = 여러 구역의 시민들이 자발적으로 협력하여 공동 프로젝트를 제안했습니다.
+
+trigger_type      = condition
+city_mask         = 0x0038
+city_min          = 0x0020
+city_max          = 0x0038
+human_mask        = 0x0000000000000003
+human_min         = 0x0000000000000001
+human_max         = 0x0000000000000002
+min_human_count   = 10
+
+cooldown_min      = 15
+cooldown_max      = 30
+
+effect_scope      = AllHumans
+requires_player   = true
+
+choice_1_text     = 적극 지원한다
+choice_1_effect   = ModifyDrive, Motivation, 400, AllHumans
+choice_1_effect   = ModifyDrive, InterpersonalTrust, 300, AllHumans
+choice_1_effect   = ModifyCityMetric, Mood, 300, City
+choice_1_effect   = ModifyCityMetric, Activity, 200, City
+
+choice_2_text     = 관망하며 지켜본다
+choice_2_effect   = ModifyDrive, Motivation, 100, Triggered
+choice_2_effect   = ModifyDrive, SenseOfControl, 100, Triggered
+
+choice_3_text     = 더 시급한 일에 집중하라고 한다
+choice_3_effect   = ModifyDrive, Motivation, -300, Triggered
+choice_3_effect   = ModifyDrive, InterpersonalTrust, -200, Triggered
+choice_3_effect   = ModifyCityMetric, Activity, 100, City
+[EVENT_END]
+
+
+################################################################################
+#                   GENERAL (일반 이벤트)
+################################################################################
+
+[EVENT_START]
+id                = general_rumor_001
+name              = 퍼지는 소문
+category          = Social
+description       = 도시 전체에 불안한 소문이 퍼지고 있습니다. 출처를 알 수 없는 이야기들이 시민들을 동요시킵니다.
+
+trigger_type      = condition
+city_mask         = 0x0038
+city_min          = 0x0000
+city_max          = 0x0010
+human_mask        = 0x0000000000000700
+human_min         = 0x0000000000000300
+human_max         = 0x0000000000000700
+min_human_count   = 15
+
+cooldown_min      = 8
+cooldown_max      = 15
+
+effect_scope      = AllHumans
+requires_player   = true
+
+choice_1_text     = 공식 발표로 사실을 밝힌다
+choice_1_effect   = ModifyDrive, StressLoad, -300, AllHumans
+choice_1_effect   = ModifyDrive, SocialSafety, 200, AllHumans
+choice_1_effect   = ModifyDrive, InterpersonalTrust, 100, AllHumans
+
+choice_2_text     = 무시하고 자연스럽게 사그라들게 한다
+choice_2_effect   = ModifyDrive, StressLoad, 200, AllHumans
+choice_2_effect   = ModifyDrive, SocialSafety, -200, AllHumans
+
+choice_3_text     = 소문의 출처를 찾아 대응한다
+choice_3_effect   = ModifyDrive, StressLoad, 100, AllHumans
+choice_3_effect   = ModifyDrive, InterpersonalTrust, -100, AllHumans
+choice_3_effect   = ModifyDrive, SenseOfControl, 100, AllHumans
+[EVENT_END]
+
+[EVENT_START]
+id                = general_celebration_001
+name              = 자발적 축제
+category          = Social
+description       = 시민들이 자발적으로 작은 축제를 열고 싶어합니다. 힘든 시기에 잠시나마 즐거움을 찾고 싶다고 합니다.
+
+trigger_type      = condition
+city_mask         = 0x0038
+city_min          = 0x0018
+city_max          = 0x0038
+human_mask        = 0x00000000E0000000
+human_min         = 0x0000000060000000
+human_max         = 0x00000000E0000000
+min_human_count   = 20
+
+cooldown_min      = 20
+cooldown_max      = 40
+
+effect_scope      = AllHumans
+requires_player   = true
+
+choice_1_text     = 허락하고 물자를 지원한다
+choice_1_effect   = ModifyCityMetric, Scarcity, 300, City
+choice_1_effect   = ModifyDrive, Motivation, 500, AllHumans
+choice_1_effect   = ModifyDrive, StressLoad, -400, AllHumans
+choice_1_effect   = ModifyCityMetric, Mood, 400, City
+
+choice_2_text     = 허락하되 물자 지원은 없다
+choice_2_effect   = ModifyDrive, Motivation, 200, AllHumans
+choice_2_effect   = ModifyDrive, StressLoad, -200, AllHumans
+choice_2_effect   = ModifyCityMetric, Mood, 200, City
+
+choice_3_text     = 지금은 때가 아니라고 거절한다
+choice_3_effect   = ModifyDrive, Motivation, -300, AllHumans
+choice_3_effect   = ModifyDrive, StressLoad, 100, AllHumans
+choice_3_effect   = ModifyDrive, SenseOfControl, -200, AllHumans
+[EVENT_END]
+
+[EVENT_START]
+id                = general_death_001
+name              = 시민의 죽음
+category          = Personal
+description       = 한 시민이 사망했습니다. 자연사인지 다른 원인인지 확인이 필요합니다.
+
+trigger_type      = condition
+city_mask         = 0x0000
+human_mask        = 0x000000000001C040
+human_min         = 0x000000000001C040
+human_max         = 0x000000000001C0C0
+min_human_count   = 1
+
+cooldown_min      = 20
+cooldown_max      = 40
+
+effect_scope      = AllHumans
+requires_player   = true
+
+choice_1_text     = 조용히 장례를 치른다
+choice_1_effect   = ModifyDrive, StressLoad, 200, AllHumans
+choice_1_effect   = ModifyDrive, SocialSafety, -100, AllHumans
+choice_1_effect   = Kill, 0, 1, Triggered
+
+choice_2_text     = 전체 시민에게 알리고 함께 애도한다
+choice_2_effect   = ModifyDrive, StressLoad, 300, AllHumans
+choice_2_effect   = ModifyDrive, InterpersonalTrust, 200, AllHumans
+choice_2_effect   = ModifyDrive, SocialSafety, 100, AllHumans
+choice_2_effect   = Kill, 0, 1, Triggered
+
+choice_3_text     = 사인을 철저히 조사한다
+choice_3_effect   = ModifyDrive, StressLoad, 400, AllHumans
+choice_3_effect   = ModifyDrive, SocialSafety, -200, AllHumans
+choice_3_effect   = ModifyDrive, InterpersonalTrust, -100, AllHumans
+choice_3_effect   = Kill, 0, 1, Triggered
+[EVENT_END]

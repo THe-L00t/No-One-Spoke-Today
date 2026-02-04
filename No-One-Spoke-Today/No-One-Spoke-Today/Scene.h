@@ -124,6 +124,24 @@ private:
 	int citizenInfoMode{ 0 };  // 0: 성향, 1: 누적값, 2: 상태
 	int angleInputBuffer{ 0 }; // 각도 입력 버퍼
 	std::string navigationInputBuffer;   // 좌표 입력 버퍼
+
+	// 하부구동부 대화 시스템
+	enum class AngleDialogueState {
+		Idle,           // 대기 (입력 받는 상태)
+		Confirming,     // 지시 확인 중 (대사 출력)
+		Completed       // 완료 (아무 키나 누르면 Idle로)
+	};
+	AngleDialogueState angleDialogueState{ AngleDialogueState::Idle };
+	int pendingAngle{ 0 };                // 지시할 각도
+	int selectedPlayerDialogue{ 0 };      // 선택된 플레이어 대사 인덱스
+	Human* lowerDriveLeader{ nullptr };   // 하부구동부 작업반장
+
+	// 대화 관련 헬퍼
+	std::string GetPlayerAngleDialogue(int angle, int orderCount);
+	std::string GetWorkerResponse(Human* leader, int angle, int orderCount);
+	Human* SelectLowerDriveLeader();
+	std::string GetFatigueBar(Human* h);
+
 	std::default_random_engine rng{ std::random_device{}() };
 };
 

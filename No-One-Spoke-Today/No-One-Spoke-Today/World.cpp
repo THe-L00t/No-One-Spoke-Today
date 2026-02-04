@@ -97,6 +97,14 @@ void World::Update(float deltaTime)
 			day = 1;
 			month++;
 		}
+
+		// 하루 시작 시 플레이어를 조타실로 이동
+		playerRegion = Region::Cockpit;
+
+		// 하부구동부 지시 횟수 리셋
+		angleOrderCountToday = 0;
+		lastAngleOrderDay = currentDay;
+
 		eventManager->ProcessDailyEvents(*city, city->GetCityMet(), humans, currentDay);
 
 		// 네비게이션 업데이트 (이동 진행, 정비 체크)
@@ -346,4 +354,52 @@ void World::MarkRegionEventSeen(Region r)
 const std::set<Region>& World::GetUnseenEventRegions() const
 {
 	return unseenEventRegions;
+}
+
+// ========== 하부구동부 지시 관리 ==========
+void World::IncrementAngleOrderCount()
+{
+	ResetAngleOrderCountIfNewDay();
+	angleOrderCountToday++;
+
+	// 지시 횟수에 따른 하부구동부 인원 스트레스/피로 증가
+	auto lowerDriveHumans = GetHumansInRegion(Region::LowerDrive);
+
+	if (angleOrderCountToday >= 3) {
+		int stressDelta = 0;
+		int fatigueDelta = 0;
+		int trustDelta = 0;
+
+		if (angleOrderCountToday == 3) {
+			stressDelta = 200;
+			fatigueDelta = 100;
+		}
+		else if (angleOrderCountToday == 4) {
+			stressDelta = 400;
+			fatigueDelta = 200;
+			trustDelta = -100;
+		}
+		else {  // 5회 이상
+			stressDelta = 600;
+			fatigueDelta = 300;
+			trustDelta = -200;
+		}
+
+		for (Human* h : lowerDriveHumans) {
+			h->ModifyStressLoad(stressDelta);
+			h->ModifyFatigue(fatigueDelta);
+			if (trustDelta != 0) {
+				h->ModifyInterpersonalTrust(trustDelta);
+			}
+			h->UpdateMentalState();
+		}
+	}
+}
+
+void World::ResetAngleOrderCountIfNewDay()
+{
+	if (lastAngleOrderDay != currentDay) {
+		angleOrderCountToday = 0;
+		lastAngleOrderDay = currentDay;
+	}
 }

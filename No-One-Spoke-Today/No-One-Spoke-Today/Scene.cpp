@@ -707,6 +707,14 @@ void SaveScene::LoadWorld()
 		world->GetNavigation()->LoadState(in);
 	}
 
+	// 하부구동부 지시 횟수 로드 (버전 5 이상)
+	if (version >= 5) {
+		int32_t angleOrderCount;
+		in.read(reinterpret_cast<char*>(&angleOrderCount), sizeof(angleOrderCount));
+		world->SetAngleOrderCountToday(angleOrderCount);
+		world->SetLastAngleOrderDay(world->GetCurrentDay());
+	}
+
 	in.close();
 	saveAble = true;
 	std::cout << "로드 완료: data/" << fileName << ".bin" << std::endl;
@@ -746,8 +754,8 @@ void SaveScene::SaveWorld()
 	std::ofstream out{ "data/" + fileName + ".bin", std::ios::binary };
 	if (not out) return;
 
-	// 버전 (4: 좌표 기반 네비게이션 시스템)
-	uint32_t version = 4;
+	// 버전 (5: 하부구동부 지시 시스템 추가)
+	uint32_t version = 5;
 	out.write(reinterpret_cast<const char*>(&version), sizeof(version));
 	std::cout << "버전 저장";
 	// 월드 시간 정보
@@ -832,6 +840,11 @@ void SaveScene::SaveWorld()
 		world->GetNavigation()->SaveState(out);
 		std::cout << "네비게이션 저장";
 	}
+
+	// 하부구동부 지시 횟수 저장 (버전 5)
+	int32_t angleOrderCount = world->GetAngleOrderCountToday();
+	out.write(reinterpret_cast<const char*>(&angleOrderCount), sizeof(angleOrderCount));
+	std::cout << "지시횟수 저장";
 
 	out.close();
 	std::cout << "저장 완료: data/" << fileName << ".bin" << std::endl;
@@ -1515,6 +1528,65 @@ void GameScene::DisplayRegionEventAlert(Region region, const std::string& eventN
 }
 
 // ========== 시민 정보 관련 헬퍼 함수 ==========
+// UTF-8 문자열의 콘솔 표시 너비 계산
+int GetDisplayWidth(const std::string& str) {
+	int width = 0;
+	size_t i = 0;
+	while (i < str.size()) {
+		unsigned char c = str[i];
+		if ((c & 0x80) == 0) {
+			// ASCII (1바이트) - 너비 1
+			width += 1;
+			i += 1;
+		}
+		else if ((c & 0xE0) == 0xC0) {
+			// 2바이트 문자 - 너비 1
+			width += 1;
+			i += 2;
+		}
+		else if ((c & 0xF0) == 0xE0) {
+			// 3바이트 문자 (한글, 화살표 등)
+			// 한글 범위 (U+AC00 ~ U+D7A3) 체크
+			if (i + 2 < str.size()) {
+				unsigned char c2 = str[i + 1];
+				unsigned char c3 = str[i + 2];
+				// UTF-8 디코딩: ((c & 0x0F) << 12) | ((c2 & 0x3F) << 6) | (c3 & 0x3F)
+				int codepoint = ((c & 0x0F) << 12) | ((c2 & 0x3F) << 6) | (c3 & 0x3F);
+				// 한글 범위 또는 전각 문자
+				if ((codepoint >= 0xAC00 && codepoint <= 0xD7A3) ||  // 한글
+					(codepoint >= 0x3000 && codepoint <= 0x303F) ||  // CJK 기호
+					(codepoint >= 0xFF00 && codepoint <= 0xFFEF)) {  // 전각 문자
+					width += 2;
+				}
+				else {
+					width += 1;  // 화살표, 성별 기호 등
+				}
+			}
+			i += 3;
+		}
+		else if ((c & 0xF8) == 0xF0) {
+			// 4바이트 문자 - 너비 2
+			width += 2;
+			i += 4;
+		}
+		else {
+			i += 1;
+		}
+	}
+	return width;
+}
+
+// 고정 너비로 패딩된 문자열 생성
+std::string PadToWidth(const std::string& str, int targetWidth) {
+	int currentWidth = GetDisplayWidth(str);
+	std::string result = str;
+	while (currentWidth < targetWidth) {
+		result += ' ';
+		currentWidth++;
+	}
+	return result;
+}
+
 // 성향 방향 기호 (0-100 → ↑/→/↓)
 std::string GetTraitArrow(int value) {
 	if (value >= 67) return "↑";
@@ -1671,11 +1743,11 @@ void GameScene::DisplayCitizenInfo()
 				}
 				}
 
-				line += std::format("{:<22}", info);
+				line += PadToWidth(info, 22);
 			}
 
-			// 줄 맞춤
-			while (line.size() < 74) line += "  ";
+			// 줄 맞춤 (표시 너비 기준)
+			while (GetDisplayWidth(line) < 71) line += " ";
 			line += "║";
 			std::println("{}", line);
 		}
@@ -1886,44 +1958,256 @@ void GameScene::HandleNavigationInput(char input)
 	}
 }
 
+// ========== 하부구동부 대화 헬퍼 함수 ==========
+Human* GameScene::SelectLowerDriveLeader()
+{
+	if (!world) return nullptr;
+
+	auto lowerDriveHumans = world->GetHumansInRegion(Region::LowerDrive);
+	if (lowerDriveHumans.empty()) return nullptr;
+
+	// 이성↑ & 계획↑인 사람 우선 선택, 없으면 첫 번째 사람
+	for (Human* h : lowerDriveHumans) {
+		if (h->GetRationality() >= 50 && h->GetPlanning() >= 50) {
+			return h;
+		}
+	}
+	return lowerDriveHumans[0];
+}
+
+std::string GameScene::GetFatigueBar(Human* h)
+{
+	if (!h) return "□□□□□";
+
+	int level = h->GetFatigue() / 2000;  // 0-10000 → 0-5
+	if (level > 5) level = 5;
+
+	std::string bar;
+	for (int i = 0; i < level; ++i) bar += "■";
+	for (int i = level; i < 5; ++i) bar += "□";
+	return bar;
+}
+
+std::string GameScene::GetPlayerAngleDialogue(int angle, int orderCount)
+{
+	// 지시 횟수에 따라 대사 선택
+	std::vector<std::string> dialogues;
+
+	if (orderCount <= 1) {
+		// 첫 지시: 정중한 대사
+		dialogues = {
+			std::format("이동 각도를 {}도로 맞춰주시오.", angle),
+			std::format("방향을 {}도로 틀어야 합니다.", angle),
+			std::format("{}도로 조정 부탁드립니다.", angle),
+			std::format("계산 결과, {}도가 필요합니다.", angle),
+			std::format("수고스럽겠지만 {}도로 부탁합니다.", angle)
+		};
+	}
+	else if (orderCount == 2) {
+		// 두 번째: 약간 긴급
+		dialogues = {
+			std::format("지금 바로 {}도로 변경해주십시오.", angle),
+			std::format("{}도로 조정 부탁드립니다.", angle),
+			std::format("다시 한번 확인했습니다. {}도입니다.", angle)
+		};
+	}
+	else if (orderCount == 3) {
+		// 세 번째: 재지시/사과
+		dialogues = {
+			std::format("잠깐, 방금 틀었는데... {}도로 다시.", angle),
+			std::format("미안하지만 또 바꿔야 할 것 같습니다. {}도로.", angle),
+			std::format("죄송합니다, 다시 {}도로 맞춰주십시오.", angle)
+		};
+	}
+	else {
+		// 4회 이상: 확신/번복
+		dialogues = {
+			std::format("이번이 마지막입니다. {}도로.", angle),
+			std::format("아까 말한 건 취소하고, {}도로 가겠습니다.", angle),
+			std::format("...{}도입니다. 부탁합니다.", angle)
+		};
+	}
+
+	std::uniform_int_distribution<int> dist(0, static_cast<int>(dialogues.size()) - 1);
+	return dialogues[dist(rng)];
+}
+
+std::string GameScene::GetWorkerResponse(Human* leader, int angle, int orderCount)
+{
+	if (!leader) return std::format("...{}도, 알겠습니다.", angle);
+
+	ArousalState arousal = leader->GetArousal();
+	int stress = leader->GetStressLoad();
+	int fatigue = leader->GetFatigue();
+
+	std::vector<std::string> responses;
+
+	// 적대적 상태
+	if (arousal == ArousalState::Hostile) {
+		responses = {
+			"맨날 바꾸고 바꾸고... 직접 하시죠?",
+			std::format("또요? 아까 그 각도 아니었어요?"),
+			std::format("그 각도가 맞긴 한 겁니까? ...{}도.", angle)
+		};
+	}
+	// 과민 상태 또는 스트레스 높음
+	else if (arousal == ArousalState::Irritable || stress >= 7000) {
+		responses = {
+			"벌써 몇 번째입니까?",
+			"제대로 계산하고 오신 겁니까?",
+			std::format("...됐습니다. {}도.", angle)
+		};
+	}
+	// 피로 상태
+	else if (fatigue >= 6000) {
+		responses = {
+			std::format("...네. {}도요.", angle),
+			"(한숨) 알겠습니다.",
+			std::format("또요? 아, 네. {}도.", angle)
+		};
+	}
+	// 긴장 상태
+	else if (arousal == ArousalState::Tense) {
+		responses = {
+			std::format("네, {}도... 맞습니까?", angle),
+			std::format("{}도, 확인했습니다.", angle),
+			"알겠습니다. 바로 조정하겠습니다."
+		};
+	}
+	// 정상 상태
+	else {
+		if (orderCount <= 2) {
+			responses = {
+				std::format("알겠습니다. {}도로 조정하겠습니다.", angle),
+				"네, 바로 맞추겠습니다.",
+				std::format("{}도, 확인했습니다.", angle)
+			};
+		}
+		else {
+			responses = {
+				std::format("네... {}도요.", angle),
+				std::format("알겠습니다. {}도로 다시 맞추겠습니다.", angle),
+				"...알겠습니다."
+			};
+		}
+	}
+
+	std::uniform_int_distribution<int> dist(0, static_cast<int>(responses.size()) - 1);
+	return responses[dist(rng)];
+}
+
 void GameScene::DisplayAngleMenu()
 {
 	if (!world || !world->GetNavigation()) return;
 
+	system("cls");
+
 	Navigation* nav = world->GetNavigation();
 
+	// 작업반장 선택 (없으면 선택)
+	if (!lowerDriveLeader) {
+		lowerDriveLeader = SelectLowerDriveLeader();
+	}
+
 	std::println("");
-	std::println("  ══════════════ [하부구동부 - 이동 각도 설정] ══════════════");
+	std::println("  ╔══════════════════════════════════════════════════════════╗");
+	std::println("  ║            [하부구동부 - 이동 각도 지시]                  ║");
+	std::println("  ╠══════════════════════════════════════════════════════════╣");
 	std::println("");
 
-	// 현재 위치 정보
-	std::println("  현재 위치: ({}, {})", nav->GetCurrentX(), nav->GetCurrentY());
-	std::println("  현재 지형: {}", GetTerrainName(nav->GetCurrentTerrain()));
-	std::println("  총 이동 일수: {}일", nav->GetTraveledDays());
+	// 현재 상태 정보
+	std::println("    현재 위치: ({}, {})    현재 각도: {}°",
+		nav->GetCurrentX(), nav->GetCurrentY(), nav->GetMovementAngle());
+	std::println("    오늘 지시 횟수: {}회", world->GetAngleOrderCountToday());
 	std::println("");
 
-	// 각도 설정 UI (목적지 정보 없음)
-	std::println("  ┌──────────────────────────────────────┐");
-	std::println("  │      현재 이동 각도: {:>3}°            │", nav->GetMovementAngle());
-	std::println("  └──────────────────────────────────────┘");
-	std::println("");
+	// 대화 상태에 따른 화면
+	if (angleDialogueState == AngleDialogueState::Idle) {
+		// 작업반장 정보 표시
+		if (lowerDriveLeader) {
+			std::string gender = lowerDriveLeader->IsMale() ? "♂" : "♀";
+			std::println("    ┌────────────────────────────────────────────────┐");
+			std::println("    │ 작업반장 {}{} (피로: {})                │",
+				PadToWidth(lowerDriveLeader->GetName(), 8), gender,
+				GetFatigueBar(lowerDriveLeader));
+			std::println("    │                                                │");
 
-	// 방향 안내
-	std::println("          0° (북)");
-	std::println("            │");
-	std::println("   270° ────┼──── 90°");
-	std::println("   (서)     │     (동)");
-	std::println("          180°");
-	std::println("          (남)");
-	std::println("");
+			// 상태에 따른 대기 대사
+			std::string waitingMsg;
+			ArousalState arousal = lowerDriveLeader->GetArousal();
+			if (arousal == ArousalState::Hostile) {
+				waitingMsg = "\"...뭡니까.\"";
+			}
+			else if (arousal == ArousalState::Irritable) {
+				waitingMsg = "\"무슨 일이십니까.\"";
+			}
+			else if (lowerDriveLeader->GetFatigue() >= 6000) {
+				waitingMsg = "\"...네, 말씀하십시오.\"";
+			}
+			else {
+				waitingMsg = "\"무엇을 도와드릴까요?\"";
+			}
+			std::println("    │ {}                          │", PadToWidth(waitingMsg, 30));
+			std::println("    └────────────────────────────────────────────────┘");
+		}
 
-	std::println("  도시는 매일 설정된 각도 방향으로 이동합니다.");
-	std::println("  조타실에서 계산한 필요 각도를 여기서 입력하세요.");
+		std::println("");
+		std::println("    ┌────────────────────────────────────────────────┐");
+		std::println("    │              방향 안내                         │");
+		std::println("    │                 0° (북)                        │");
+		std::println("    │                   │                            │");
+		std::println("    │        270° ──────┼────── 90°                  │");
+		std::println("    │        (서)       │       (동)                 │");
+		std::println("    │                 180°                           │");
+		std::println("    │                 (남)                           │");
+		std::println("    └────────────────────────────────────────────────┘");
+		std::println("");
+
+		// 입력 안내
+		if (angleInputBuffer > 0) {
+			std::println("    입력 중: {}°", angleInputBuffer);
+		}
+		else {
+			std::println("    지시할 각도를 입력하세요.");
+		}
+		std::println("");
+		std::println("    [0-9] 각도 입력    [Enter] 지시    [ESC] 나가기");
+		std::println("    [C] 입력 초기화");
+	}
+	else if (angleDialogueState == AngleDialogueState::Confirming ||
+		angleDialogueState == AngleDialogueState::Completed) {
+		// 대화 출력
+		std::println("    ┌────────────────────────────────────────────────┐");
+		std::println("    │ [당신]                                         │");
+		std::println("    │ \"{}\"", PadToWidth(GetPlayerAngleDialogue(pendingAngle,
+			world->GetAngleOrderCountToday()), 45));
+		std::println("    └────────────────────────────────────────────────┘");
+		std::println("");
+
+		if (lowerDriveLeader) {
+			std::string gender = lowerDriveLeader->IsMale() ? "♂" : "♀";
+			std::println("    ┌────────────────────────────────────────────────┐");
+			std::println("    │ [작업반장 {}{}]                              │",
+				PadToWidth(lowerDriveLeader->GetName(), 6), gender);
+			std::println("    │ \"{}\"", PadToWidth(GetWorkerResponse(lowerDriveLeader,
+				pendingAngle, world->GetAngleOrderCountToday()), 45));
+			std::println("    └────────────────────────────────────────────────┘");
+		}
+
+		std::println("");
+		std::println("    >> 각도가 {}°로 설정되었습니다.", pendingAngle);
+
+		if (world->GetAngleOrderCountToday() >= 3) {
+			std::println("");
+			std::println("    [!] 잦은 지시로 작업자들의 피로와 스트레스가 증가했습니다.");
+		}
+
+		std::println("");
+		std::println("    [아무 키나 누르세요]");
+	}
+
 	std::println("");
-	std::println("  [←/→] 1° 조정  [A/D] 10° 조정");
-	std::println("  숫자 입력 후 Enter: 직접 설정");
-	std::println("  [ESC] 닫기");
-	std::print("  > ");
+	std::println("  ╚══════════════════════════════════════════════════════════╝");
 }
 
 void GameScene::HandleAngleInput(char input)
@@ -1932,46 +2216,72 @@ void GameScene::HandleAngleInput(char input)
 
 	Navigation* nav = world->GetNavigation();
 
+	// 대화 완료 상태에서 아무 키나 누르면 Idle로
+	if (angleDialogueState == AngleDialogueState::Completed) {
+		angleDialogueState = AngleDialogueState::Idle;
+		angleInputBuffer = 0;
+		DisplayAngleMenu();
+		return;
+	}
+
+	// 대화 확인 중 상태에서 아무 키나 누르면 완료로
+	if (angleDialogueState == AngleDialogueState::Confirming) {
+		angleDialogueState = AngleDialogueState::Completed;
+		DisplayAngleMenu();
+		return;
+	}
+
+	// Idle 상태
 	if (input == 27) {  // ESC
 		showingAngleMenu = false;
 		angleInputBuffer = 0;
+		angleDialogueState = AngleDialogueState::Idle;
+		lowerDriveLeader = nullptr;
 		system("cls");
 		DisplayDayStart();
 		for (const auto& d : dayLog) {
-			std::println("    \"{}\"\n", d);
+			std::println("    \"{}\"", d);
 		}
 		return;
 	}
 
-	// 숫자 입력 (직접 각도 설정)
-	if (input >= '0' && input <= '9') {
-		angleInputBuffer = angleInputBuffer * 10 + (input - '0');
-		if (angleInputBuffer > 359) {
-			angleInputBuffer = angleInputBuffer % 360;
-		}
-		std::print("{}", input);
-		return;
-	}
-
-	// Enter로 각도 확정
-	if (input == '\r' && angleInputBuffer > 0) {
-		nav->SetMovementAngle(angleInputBuffer);
-		std::println("\n  >> 각도를 {}°로 설정했습니다.", angleInputBuffer);
+	// C로 입력 초기화
+	if (input == 'c' || input == 'C') {
 		angleInputBuffer = 0;
 		DisplayAngleMenu();
 		return;
 	}
 
-	// A/D로 10도 조정
-	if (input == 'a' || input == 'A') {
-		int newAngle = nav->GetMovementAngle() - 10;
-		nav->SetMovementAngle(newAngle);
+	// 숫자 입력
+	if (input >= '0' && input <= '9') {
+		angleInputBuffer = angleInputBuffer * 10 + (input - '0');
+		if (angleInputBuffer > 359) {
+			angleInputBuffer = angleInputBuffer % 1000;
+			if (angleInputBuffer > 359) {
+				angleInputBuffer = angleInputBuffer % 100;
+			}
+		}
 		DisplayAngleMenu();
 		return;
 	}
-	if (input == 'd' || input == 'D') {
-		int newAngle = nav->GetMovementAngle() + 10;
-		nav->SetMovementAngle(newAngle);
+
+	// Enter로 지시 확정
+	if (input == '\r' && angleInputBuffer >= 0) {
+		pendingAngle = angleInputBuffer;
+
+		// 실제 각도 설정
+		nav->SetMovementAngle(pendingAngle);
+
+		// 지시 횟수 증가 및 스트레스/피로 적용
+		world->IncrementAngleOrderCount();
+
+		// 작업반장 상태 업데이트
+		if (lowerDriveLeader) {
+			lowerDriveLeader->UpdateMentalState();
+		}
+
+		// 대화 상태로 전환
+		angleDialogueState = AngleDialogueState::Confirming;
 		DisplayAngleMenu();
 		return;
 	}
