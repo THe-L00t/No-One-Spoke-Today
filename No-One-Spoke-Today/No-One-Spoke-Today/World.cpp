@@ -104,12 +104,14 @@ void World::Update(float deltaTime)
 			if (navigation->IsInMaintenance()) {
 				navigation->UpdateMaintenance();
 			}
-			else if (navigation->HasActiveRoute()) {
+			else {
+				// 매일 현재 각도 방향으로 이동
 				navigation->UpdateTravel();
 
-				// 도착 체크
-				if (navigation->HasArrived()) {
-					navigation->CompleteArrival();
+				// 지역 근접 체크
+				int nearbyRegion = navigation->CheckNearbyRegion(30);
+				if (nearbyRegion >= 0) {
+					navigation->OnRegionArrival(nearbyRegion);
 				}
 
 				// 이동 중 힌트 발견 시도

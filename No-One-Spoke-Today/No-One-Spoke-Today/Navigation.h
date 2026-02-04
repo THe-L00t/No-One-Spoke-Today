@@ -149,17 +149,19 @@ struct MapRegion {
 
 
 // ============================================================
-// 경로 정보
+// 경로 정보 (좌표 기반)
 // ============================================================
 struct Route {
-	int destinationId;           // 목적지 지역 ID
+	int targetX;                 // 목표 X 좌표
+	int targetY;                 // 목표 Y 좌표
 	int totalDistance;           // 총 거리
-	int daysRequired;            // 소요 일수
+	int estimatedDays;           // 예상 소요 일수
 	int requiredAngle;           // 필요 각도 (0-359)
+	bool isSet;                  // 경로가 설정되었는지
 
 	Route()
-		: destinationId(-1), totalDistance(0)
-		, daysRequired(0), requiredAngle(0)
+		: targetX(0), targetY(0), totalDistance(0)
+		, estimatedDays(0), requiredAngle(0), isSet(false)
 	{}
 };
 
@@ -204,24 +206,24 @@ public:
 	const MapRegion* GetRegion(int id) const;
 	std::vector<const MapRegion*> GetDiscoveredRegions() const;
 
-	// 경로 설정 (조타실)
-	bool SetDestination(int regionId);
-	void CancelRoute();
-	bool HasActiveRoute() const { return activeRoute.destinationId >= 0; }
-	const Route& GetCurrentRoute() const { return activeRoute; }
+	// 경로 계산 (조타실) - 정보 제공만, 실제 이동 방향 변경 안 함
+	Route CalculateRoute(int targetX, int targetY) const;
+	void SetTargetCoordinates(int targetX, int targetY);  // 목표 좌표 저장 (참고용)
+	void ClearTarget();
+	bool HasTarget() const { return targetRoute.isSet; }
+	const Route& GetTargetRoute() const { return targetRoute; }
 
-	// 각도 설정 (하부구동부)
+	// 각도 설정 (하부구동부) - 실제 이동 방향 변경
 	void SetMovementAngle(int angle);
 	int GetMovementAngle() const { return currentAngle; }
-	int GetRequiredAngle() const { return activeRoute.requiredAngle; }
-	bool IsAngleCorrect(int tolerance = 5) const;
 
-	// 이동 처리
+	// 이동 처리 (매일 현재 각도 방향으로 이동)
 	void UpdateTravel();
-	int GetTravelProgress() const { return travelProgress; }
-	int GetRemainingDays() const;
-	bool HasArrived() const;
-	void CompleteArrival();
+	int GetTraveledDays() const { return traveledDays; }
+
+	// 지역 도착 체크
+	int CheckNearbyRegion(int proximityThreshold = 30) const;  // 근처 지역 ID 반환 (-1: 없음)
+	void OnRegionArrival(int regionId);  // 지역 도착 처리
 
 	// 정비 모드
 	void StartMaintenance(int days);
@@ -238,11 +240,12 @@ public:
 	float GetEventModifier() const;
 	float GetTemperatureModifier(float factor) const;
 
-	// 힌트 시스템
+	// 힌트 시스템 (좌표 기반)
 	LocationHint GenerateHint(int regionId, bool exact = false);
 	void DiscoverRegion(int regionId);
-	bool TryDiscoverHintDuringTravel();
-	bool TryDiscoverHintFromDialogue();
+	std::pair<bool, LocationHint> TryDiscoverHintDuringTravel();  // 힌트 발견 시 좌표 반환
+	std::pair<bool, LocationHint> TryDiscoverHintFromDialogue();  // 힌트 발견 시 좌표 반환
+	std::vector<LocationHint> GetDiscoveredHints() const;  // 발견된 좌표 목록
 
 	// 저장/로드
 	void SaveState(std::ofstream& out) const;
@@ -254,6 +257,7 @@ private:
 	int CalculateAngle(int x1, int y1, int x2, int y2) const;
 	int CalculateDaysRequired(int distance, TerrainType terrain) const;
 	TerrainType GetTerrainAtPosition(int x, int y) const;
+	void MoveInDirection(int angle, int distance);  // 각도 방향으로 이동
 
 	// 지역 데이터
 	std::vector<MapRegion> regions;
@@ -262,10 +266,15 @@ private:
 	int currentX;
 	int currentY;
 
-	// 경로 상태
-	Route activeRoute;
-	int currentAngle;            // 현재 설정된 각도
-	int travelProgress;          // 이동 진행 (일)
+	// 목표 좌표 (조타실에서 설정, 참고용)
+	Route targetRoute;
+
+	// 이동 상태
+	int currentAngle;            // 현재 설정된 이동 각도
+	int traveledDays;            // 총 이동 일수
+
+	// 발견된 힌트 목록
+	std::vector<LocationHint> discoveredHints;
 
 	// 정비 상태
 	bool inMaintenance;

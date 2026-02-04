@@ -85,19 +85,19 @@ inline const char* GetRegionName(Region region) {
 
 // 구역 연결 그래프 (인접 리스트)
 // 구조:
-//                    [조타실] ← 플레이어 시작 위치
-//                       │
-//                 [외벽정비구역]
-//                    /  │  \
-//                   /   │   \
-//            [식당]───[순환정제소]
-//             / |  \    /  |
-//            /  |   \  /   |
-//     [거주구역1]  [수직농장]  [거주구역2]
-//           |
-//     [중앙동력로]
-//           │
-//     [하부구동부]
+//                     [조타실]
+//                        │
+//                  [외벽정비구역]
+//                    /       \
+//               [식당]───────[순환정제소]
+//               /│ \         / │ \
+//              / │  \       /  │  \
+//       [거주1] │ [수직농장]   │ [거주2]
+//               │  /      \    │
+//               │ /        \   │
+//            [중앙동력로]──────┘
+//                  │
+//             [하부구동부]
 
 inline std::vector<Region> GetAdjacentRegions(Region region) {
 	switch (region) {
@@ -106,19 +106,19 @@ inline std::vector<Region> GetAdjacentRegions(Region region) {
 	case Region::OuterWallMaintenance:
 		return { Region::Cockpit, Region::Canteen, Region::RecyclingPlant };
 	case Region::Canteen:
-		return { Region::OuterWallMaintenance, Region::RecyclingPlant, Region::ResidentialArea1, Region::VerticalFarm };
+		return { Region::OuterWallMaintenance, Region::CentralPowerway, Region::VerticalFarm, Region::ResidentialArea1 };
 	case Region::RecyclingPlant:
-		return { Region::OuterWallMaintenance, Region::Canteen, Region::VerticalFarm, Region::ResidentialArea2 };
+		return { Region::OuterWallMaintenance, Region::CentralPowerway, Region::VerticalFarm, Region::ResidentialArea2 };
 	case Region::VerticalFarm:
-		return { Region::Canteen, Region::RecyclingPlant };
+		return { Region::Canteen, Region::RecyclingPlant, Region::ResidentialArea1, Region::ResidentialArea2 };
 	case Region::LowerDrive:
 		return { Region::CentralPowerway };
 	case Region::CentralPowerway:
-		return { Region::LowerDrive, Region::ResidentialArea1 };
+		return { Region::Canteen, Region::RecyclingPlant, Region::LowerDrive };
 	case Region::ResidentialArea1:
-		return { Region::Canteen, Region::CentralPowerway };
+		return { Region::Canteen, Region::VerticalFarm };
 	case Region::ResidentialArea2:
-		return { Region::RecyclingPlant };
+		return { Region::RecyclingPlant, Region::VerticalFarm };
 	default:
 		return {};
 	}

@@ -1,6 +1,7 @@
 #include "Scene.h"
 #include "Toolkit.h"
 #include <iomanip>
+#include <sstream>
 
 std::string Scene::oldScene;
 
@@ -104,6 +105,7 @@ void GameScene::Enter(std::unique_ptr<World>& w)
 	showingAngleMenu = false;
 	citizenInfoMode = 0;
 	angleInputBuffer = 0;
+	navigationInputBuffer.clear();
 	statusUpdateTimer = 0.f;
 	dialogueTimer = 0.f;
 	nextDialogueInterval = GetRandomDialogueInterval();
@@ -169,7 +171,7 @@ void GameScene::Update(float deltaTime)
 			DisplayDayStart();
 			// 저장된 대사들 다시 출력
 			for (const auto& d : dayLog) {
-				std::println("    \"{}\"", d);
+				std::println("    \"{}\"\n", d);
 			}
 		}
 
@@ -700,8 +702,8 @@ void SaveScene::LoadWorld()
 	// 이벤트 매니저 상태 로드
 	world->GetEventManager()->LoadState(in);
 
-	// 네비게이션 상태 로드 (버전 3 이상에서만)
-	if (version >= 3 && world->GetNavigation()) {
+	// 네비게이션 상태 로드 (버전 4 이상에서만, 구버전 세이브는 새로 초기화)
+	if (version >= 4 && world->GetNavigation()) {
 		world->GetNavigation()->LoadState(in);
 	}
 
@@ -744,8 +746,8 @@ void SaveScene::SaveWorld()
 	std::ofstream out{ "data/" + fileName + ".bin", std::ios::binary };
 	if (not out) return;
 
-	// 버전 (3: 네비게이션 시스템 추가)
-	uint32_t version = 3;
+	// 버전 (4: 좌표 기반 네비게이션 시스템)
+	uint32_t version = 4;
 	out.write(reinterpret_cast<const char*>(&version), sizeof(version));
 	std::cout << "버전 저장";
 	// 월드 시간 정보
@@ -825,7 +827,7 @@ void SaveScene::SaveWorld()
 	// 이벤트 매니저 상태
 	world->GetEventManager()->SaveState(out);
 
-	// 네비게이션 상태 저장 (버전 3에서 추가)
+	// 네비게이션 상태 저장 (버전 4: 좌표 기반)
 	if (world->GetNavigation()) {
 		world->GetNavigation()->SaveState(out);
 		std::cout << "네비게이션 저장";
@@ -1082,7 +1084,7 @@ void GameScene::DisplayStatus()
 	std::println("  ╔════════════════════════════════════════════════╗");
 	std::println("  ║  2156년 {:>2}월 {:>2}일                      Day {:>3} ║", month, dayOfMonth, totalDay);
 	std::println("  ╠════════════════════════════════════════════════╣");
-	std::println("  ║  [현재 위치] {:<12} (인원: {:>3}명)         ║", regionName, regionPopulation);
+	std::println("  ║  [현재 위치] {:<12} (인원: {:>3}명)        ║", regionName, regionPopulation);
 	std::println("  ╠════════════════════════════════════════════════╣");
 	std::println("  ║  [도시 상태]             [시민 상태]           ║");
 	std::println("  ║  > 분위기: {:<8}     > 인구: {:>4}명         ║", moodText, population);
@@ -1406,48 +1408,42 @@ void GameScene::DisplayRegionMap()
 	system("cls");
 
 	std::println("");
-	std::println("  ╔═══════════════════════════════════════════════════╗");
-	std::println("  ║                    [구역 맵]                      ║");
-	std::println("  ╠═══════════════════════════════════════════════════╣");
-	std::println("  ║                                                   ║");
-	std::println("  ║                  [{}] 조타실                      ║", GetRegionStatusIcon(Region::Cockpit));
-	std::println("  ║                       │                           ║");
-	std::println("  ║                [{}] 외벽정비구역                  ║", GetRegionStatusIcon(Region::OuterWallMaintenance));
-	std::println("  ║                    /  │  \\                        ║");
-	std::println("  ║                   /   │   \\                       ║");
-	std::println("  ║          [{}] 식당───[{}] 순환정제소              ║",
-		GetRegionStatusIcon(Region::Canteen), GetRegionStatusIcon(Region::RecyclingPlant));
-	std::println("  ║           / |  \\    /  |                          ║");
-	std::println("  ║          /  |   \\  /   |                          ║");
-	std::println("  ║   [{}] 거주1  [{}] 수직농장  [{}] 거주2           ║",
-		GetRegionStatusIcon(Region::ResidentialArea1),
-		GetRegionStatusIcon(Region::VerticalFarm),
-		GetRegionStatusIcon(Region::ResidentialArea2));
-	std::println("  ║        |                                          ║");
-	std::println("  ║   [{}] 중앙동력로                                 ║", GetRegionStatusIcon(Region::CentralPowerway));
-	std::println("  ║        │                                          ║");
-	std::println("  ║   [{}] 하부구동부                                 ║", GetRegionStatusIcon(Region::LowerDrive));
-	std::println("  ║                                                   ║");
-	std::println("  ╠═══════════════════════════════════════════════════╣");
-	std::println("  ║  ● 현재 위치    ! 미확인 이벤트    ○ 일반        ║");
-	std::println("  ╠═══════════════════════════════════════════════════╣");
-
-	// 구역별 인구 표시
-	std::println("  ║  [구역별 인원]                                    ║");
-	std::println("  ║  조타실:{:>3}  외벽정비:{:>3}  식당:{:>3}  순환정제:{:>3}  ║",
+	std::println("  ╔══════════════════════════════════════════════════════════════╗");
+	std::println("  ║                          [구역 맵]                           ║");
+	std::println("  ╠══════════════════════════════════════════════════════════════╣");
+	std::println("  ║                                                              ║");
+	std::println("  ║  <상부>  [{}] 조타실 (외벽정비↓)                              ║", GetRegionStatusIcon(Region::Cockpit));
+	std::println("  ║                                                              ║");
+	std::println("  ║  <중부>  [{}] 외벽정비─────────[{}] 식당                       ║", GetRegionStatusIcon(Region::OuterWallMaintenance), GetRegionStatusIcon(Region::Canteen));
+	std::println("  ║               │              /     │   \\                     ║");
+	std::println("  ║               │             /      │    \\                    ║");
+	std::println("  ║               │    [{}] 중앙동력로  │ [{}] 거주1               ║", GetRegionStatusIcon(Region::CentralPowerway), GetRegionStatusIcon(Region::ResidentialArea1));
+	std::println("  ║               │        /           │     /                   ║");
+	std::println("  ║               │       /            │    /                    ║");
+	std::println("  ║          [{}] 순환정제소───────[{}] 수직농장                   ║", GetRegionStatusIcon(Region::RecyclingPlant), GetRegionStatusIcon(Region::VerticalFarm));
+	std::println("  ║                    \\           /                             ║");
+	std::println("  ║                     \\         /                              ║");
+	std::println("  ║                       [{}] 거주2                              ║", GetRegionStatusIcon(Region::ResidentialArea2));
+	std::println("  ║                                                              ║");
+	std::println("  ║   <하부>  [{}] 하부구동부 (중앙동력로↑)                       ║", GetRegionStatusIcon(Region::LowerDrive));
+	std::println("  ║                                                              ║");
+	std::println("  ╠══════════════════════════════════════════════════════════════╣");
+	std::println("  ║  ● 현재 위치    ! 미확인 이벤트    ○ 일반                    ║");
+	std::println("  ╠══════════════════════════════════════════════════════════════╣");
+	std::println("  ║  [구역별 인원]                                               ║");
+	std::println("  ║  조타실:{:>3}   외벽정비:{:>3}   식당:{:>3}   순환정제:{:>3}         ║",
 		world->GetHumanCountInRegion(Region::Cockpit),
 		world->GetHumanCountInRegion(Region::OuterWallMaintenance),
 		world->GetHumanCountInRegion(Region::Canteen),
 		world->GetHumanCountInRegion(Region::RecyclingPlant));
-	std::println("  ║  수직농장:{:>3}  거주1:{:>3}  거주2:{:>3}             ║",
+	std::println("  ║  수직농장:{:>3}  거주1:{:>3}     거주2:{:>3}                       ║",
 		world->GetHumanCountInRegion(Region::VerticalFarm),
 		world->GetHumanCountInRegion(Region::ResidentialArea1),
 		world->GetHumanCountInRegion(Region::ResidentialArea2));
-	std::println("  ║  중앙동력로:{:>3}  하부구동부:{:>3}                    ║",
+	std::println("  ║  중앙동력로:{:>3}  하부구동부:{:>3}                              ║",
 		world->GetHumanCountInRegion(Region::CentralPowerway),
 		world->GetHumanCountInRegion(Region::LowerDrive));
-
-	std::println("  ╚═══════════════════════════════════════════════════╝");
+	std::println("  ╚══════════════════════════════════════════════════════════════╝");
 	std::println("    아무 키나 누르면 돌아갑니다...");
 }
 
@@ -1518,6 +1514,61 @@ void GameScene::DisplayRegionEventAlert(Region region, const std::string& eventN
 	std::println("    {}", alertLog);
 }
 
+// ========== 시민 정보 관련 헬퍼 함수 ==========
+// 성향 방향 기호 (0-100 → ↑/→/↓)
+std::string GetTraitArrow(int value) {
+	if (value >= 67) return "↑";
+	if (value >= 34) return "→";
+	return "↓";
+}
+
+// 누적값 5단계 (0-10000 → 0-4)
+int GetDriveLevel(int value) {
+	if (value >= 8000) return 4;
+	if (value >= 6000) return 3;
+	if (value >= 4000) return 2;
+	if (value >= 2000) return 1;
+	return 0;
+}
+
+// 상태 태그 문자
+char GetArousalTag(ArousalState state) {
+	switch (state) {
+	case ArousalState::Calm: return 'C';
+	case ArousalState::Tense: return 'T';
+	case ArousalState::Irritable: return 'I';
+	case ArousalState::Hostile: return 'H';
+	default: return '?';
+	}
+}
+
+char GetSocialTag(SocialState state) {
+	switch (state) {
+	case SocialState::Neutral: return 'N';
+	case SocialState::Cooperative: return 'C';
+	case SocialState::Withdrawn: return 'W';
+	default: return '?';
+	}
+}
+
+char GetEnergyTag(EnergyState state) {
+	switch (state) {
+	case EnergyState::Normal: return 'N';
+	case EnergyState::Fatigued: return 'F';
+	case EnergyState::Exhausted: return 'E';
+	default: return '?';
+	}
+}
+
+char GetControlTag(ControlState state) {
+	switch (state) {
+	case ControlState::Autonomous: return 'A';
+	case ControlState::Dependent: return 'D';
+	case ControlState::Stubborn: return 'S';
+	default: return '?';
+	}
+}
+
 // ========== 시민 정보 관련 함수 ==========
 void GameScene::DisplayCitizenInfo()
 {
@@ -1538,11 +1589,28 @@ void GameScene::DisplayCitizenInfo()
 	}
 
 	std::println("");
-	std::println("  ╔════════════════════════════════════════════════════════════════╗");
-	std::println("  ║                        [시민 정보]                             ║");
-	std::println("  ╠════════════════════════════════════════════════════════════════╣");
-	std::println("  ║  {}                              ║", tabs);
-	std::println("  ╠════════════════════════════════════════════════════════════════╣");
+	std::println("  ╔════════════════════════════════════════════════════════════════════╗");
+	std::println("  ║                          [시민 정보]                               ║");
+	std::println("  ╠════════════════════════════════════════════════════════════════════╣");
+	std::println("  ║  {}                                        ║", tabs);
+	std::println("  ╠════════════════════════════════════════════════════════════════════╣");
+
+	// 모드별 범례 출력
+	switch (citizenInfoMode) {
+	case 0:  // 성향
+		std::println("  ║  [범례] R:이성 A:공격 P:계획 D:의존 G:고집 E:감정민감              ║");
+		std::println("  ║         ↑:높음(67+)  →:보통(34-66)  ↓:낮음(0-33)                   ║");
+		break;
+	case 1:  // 누적값
+		std::println("  ║  [범례] S:스트레스 A:감정각성 F:피로 C:인지력                     ║");
+		std::println("  ║         T:신뢰 Y:안전감 O:통제감 M:동기  (0~4 단계)               ║");
+		break;
+	case 2:  // 상태
+		std::println("  ║  [범례] 감정: C차분/T긴장/I과민/H적대  사회: N중립/C협력/W철수    ║");
+		std::println("  ║         에너지: N정상/F피로/E소진  통제: A자율/D의존/S고집        ║");
+		break;
+	}
+	std::println("  ╠════════════════════════════════════════════════════════════════════╣");
 
 	// 구역별로 시민 정보 출력
 	for (int r = 0; r < static_cast<int>(Region::COUNT); ++r) {
@@ -1551,69 +1619,71 @@ void GameScene::DisplayCitizenInfo()
 
 		if (humansInRegion.empty()) continue;
 
-		std::println("  ║  [{:<12}] ({:>3}명)                                       ║",
+		std::println("  ║  [{:<12}] ({:>3}명)                                            ║",
 			GetRegionName(region), humansInRegion.size());
 
-		// 한 줄에 4명씩 표시
-		for (size_t i = 0; i < humansInRegion.size(); i += 4) {
+		// 한 줄에 3명씩 표시 (더 넓은 정보)
+		for (size_t i = 0; i < humansInRegion.size(); i += 3) {
 			std::string line = "  ║  ";
 
-			for (size_t j = i; j < i + 4 && j < humansInRegion.size(); ++j) {
+			for (size_t j = i; j < i + 3 && j < humansInRegion.size(); ++j) {
 				Human* h = humansInRegion[j];
 				std::string gender = h->IsMale() ? "♂" : "♀";
 				std::string name = h->GetName();
 
 				std::string info;
 				switch (citizenInfoMode) {
-				case 0:  // 성향
+				case 0:  // 성향 (방향 기호)
 				{
-					int rat = h->GetRationality() / 10;
-					int agg = h->GetAggressiveness() / 10;
-					int pln = h->GetPlanning() / 10;
-					info = std::format("{}{} R{}A{}P{}", name, gender, rat, agg, pln);
+					std::string traits = std::format("R{}A{}P{}D{}G{}E{}",
+						GetTraitArrow(h->GetRationality()),
+						GetTraitArrow(h->GetAggressiveness()),
+						GetTraitArrow(h->GetPlanning()),
+						GetTraitArrow(h->GetDependency()),
+						GetTraitArrow(h->GetRigidity()),
+						GetTraitArrow(h->GetEmotionalSensitivity()));
+					info = std::format("{}{} {}", name, gender, traits);
 					break;
 				}
-				case 1:  // 누적값
+				case 1:  // 누적값 (0-4 단계)
 				{
-					int str = h->GetStressLoad() / 100;
-					int fat = h->GetFatigue() / 100;
-					int mot = h->GetMotivation() / 100;
-					info = std::format("{}{} S{}F{}M{}", name, gender, str, fat, mot);
+					std::string drives = std::format("S{}A{}F{}C{}T{}Y{}O{}M{}",
+						GetDriveLevel(h->GetStressLoad()),
+						GetDriveLevel(h->GetEmotionalArousal()),
+						GetDriveLevel(h->GetFatigue()),
+						GetDriveLevel(h->GetCognitiveCapacity()),
+						GetDriveLevel(h->GetInterpersonalTrust()),
+						GetDriveLevel(h->GetSocialSafety()),
+						GetDriveLevel(h->GetSenseOfControl()),
+						GetDriveLevel(h->GetMotivation()));
+					info = std::format("{}{} {}", name, gender, drives);
 					break;
 				}
-				case 2:  // 상태
+				case 2:  // 상태 (태그)
 				{
-					std::string arousal;
-					switch (h->GetArousal()) {
-					case ArousalState::Calm: arousal = "차분"; break;
-					case ArousalState::Tense: arousal = "긴장"; break;
-					case ArousalState::Irritable: arousal = "과민"; break;
-					case ArousalState::Hostile: arousal = "적대"; break;
-					}
-					std::string energy;
-					switch (h->GetEnergy()) {
-					case EnergyState::Normal: energy = "정상"; break;
-					case EnergyState::Fatigued: energy = "피로"; break;
-					case EnergyState::Exhausted: energy = "소진"; break;
-					}
-					info = std::format("{}{} {}/{}", name, gender, arousal, energy);
+					std::string states = std::format("{}{}{}{}",
+						GetArousalTag(h->GetArousal()),
+						GetSocialTag(h->GetSocial()),
+						GetEnergyTag(h->GetEnergy()),
+						GetControlTag(h->GetControl()));
+					info = std::format("{}{} [{}]", name, gender, states);
 					break;
 				}
 				}
 
-				line += std::format("{:<16}", info);
+				line += std::format("{:<22}", info);
 			}
 
 			// 줄 맞춤
-			while (line.size() < 68) line += " ";
+			while (line.size() < 74) line += "  ";
 			line += "║";
 			std::println("{}", line);
 		}
 
-		std::println("  ║                                                                  ║");
+		std::println("  ║                                                                    ║");
 	}
 
-	std::println("  ╚════════════════════════════════════════════════════════════════╝");
+	std::println("  ╚════════════════════════════════════════════════════════════════════╝");
 	std::println("    [←/→] 모드 전환    [ESC] 닫기");
 }
 
@@ -1654,25 +1724,31 @@ void GameScene::DisplayNavigationStatus()
 	std::println("  현재 위치: ({}, {})", nav->GetCurrentX(), nav->GetCurrentY());
 	std::println("  현재 지형: {}", GetTerrainName(nav->GetCurrentTerrain()));
 	std::println("  현재 기온: {:.1f}°C", nav->GetCurrentTemperature());
+	std::println("  현재 이동 각도: {}°", nav->GetMovementAngle());
+	std::println("  총 이동 일수: {}일", nav->GetTraveledDays());
 	std::println("");
 
-	if (nav->HasActiveRoute()) {
-		const Route& route = nav->GetCurrentRoute();
-		const MapRegion* dest = nav->GetRegion(route.destinationId);
-		std::string destName = dest ? dest->name : "알 수 없음";
+	if (nav->HasTarget()) {
+		const Route& target = nav->GetTargetRoute();
+		std::println("  [목표 좌표] ({}, {})", target.targetX, target.targetY);
+		std::println("  예상 거리: {} 단위", target.totalDistance);
+		std::println("  필요 각도: {}°", target.requiredAngle);
+		std::println("  예상 소요: {}일", target.estimatedDays);
 
-		std::println("  [목적지] {}", destName);
-		std::println("  총 거리: {} 단위", route.totalDistance);
-		std::println("  필요 각도: {}°", route.requiredAngle);
-		std::println("  현재 각도: {}° {}", nav->GetMovementAngle(),
-			nav->IsAngleCorrect() ? "(정확)" : "(조정 필요!)");
-		std::println("  남은 일수: {}일 / 총 {}일", nav->GetRemainingDays(), route.daysRequired);
+		int angleDiff = std::abs(nav->GetMovementAngle() - target.requiredAngle);
+		if (angleDiff > 180) angleDiff = 360 - angleDiff;
+		if (angleDiff <= 5) {
+			std::println("  >> 현재 각도가 목표와 일치합니다.");
+		}
+		else {
+			std::println("  >> 하부구동부에서 각도를 {}°로 맞춰야 합니다!", target.requiredAngle);
+		}
 	}
 	else if (nav->IsInMaintenance()) {
 		std::println("  [정비 중] 남은 일수: {}일", nav->GetMaintenanceDaysLeft());
 	}
 	else {
-		std::println("  경로가 설정되지 않았습니다.");
+		std::println("  목표 좌표가 설정되지 않았습니다.");
 	}
 	std::println("");
 }
@@ -1684,32 +1760,34 @@ void GameScene::DisplayNavigationMenu()
 	Navigation* nav = world->GetNavigation();
 
 	std::println("");
-	std::println("  ══════════════ [조타실 - 목적지 설정] ══════════════");
+	std::println("  ══════════════ [조타실 - 항로 계산] ══════════════");
 	std::println("");
 
 	// 현재 상태 표시
 	DisplayNavigationStatus();
 
-	// 발견된 지역 목록 표시
-	auto discovered = nav->GetDiscoveredRegions();
+	// 발견된 힌트 좌표 목록 표시
+	auto hints = nav->GetDiscoveredHints();
 
-	if (discovered.empty()) {
-		std::println("  발견된 지역이 없습니다.");
-		std::println("  이동 중이나 대화를 통해 힌트를 얻으세요.");
+	std::println("  ──────────────── [알려진 좌표] ────────────────");
+	if (hints.empty()) {
+		std::println("  알려진 좌표가 없습니다.");
+		std::println("  이동 중이나 대화를 통해 좌표 정보를 얻으세요.");
 	}
 	else {
-		std::println("  [발견된 지역]");
-		int idx = 1;
-		for (const MapRegion* region : discovered) {
-			std::string visitedMark = region->visited ? "[방문]" : "[미방문]";
-			std::println("    {}. {} - {} ({})", idx, region->name,
-				GetTerrainName(region->terrain), visitedMark);
-			idx++;
+		for (size_t i = 0; i < hints.size(); ++i) {
+			const auto& hint = hints[i];
+			std::string exactMark = hint.isExact ? "[정확]" : "[대략]";
+			std::println("    {}. ({}, {}) {}", i + 1, hint.approximateX, hint.approximateY, exactMark);
 		}
-		std::println("");
-		std::println("  숫자로 목적지 선택, [C] 경로 취소, [ESC] 닫기");
 	}
 
+	std::println("");
+	std::println("  ──────────────── [좌표 입력] ────────────────");
+	std::println("  목표 좌표를 입력하세요 (형식: X Y)");
+	std::println("  예: 750 320");
+	std::println("");
+	std::println("  [C] 목표 해제  [ESC] 닫기");
 	std::print("  > ");
 }
 
@@ -1721,6 +1799,7 @@ void GameScene::HandleNavigationInput(char input)
 
 	if (input == 27) {  // ESC
 		showingNavigationMenu = false;
+		navigationInputBuffer.clear();
 		system("cls");
 		DisplayDayStart();
 		for (const auto& d : dayLog) {
@@ -1730,31 +1809,80 @@ void GameScene::HandleNavigationInput(char input)
 	}
 
 	if (input == 'c' || input == 'C') {
-		nav->CancelRoute();
-		std::println("\n  경로가 취소되었습니다.");
+		nav->ClearTarget();
+		std::println("\n  목표 좌표가 해제되었습니다.");
+		navigationInputBuffer.clear();
+		std::this_thread::sleep_for(std::chrono::milliseconds(500));
+		system("cls");
 		DisplayNavigationMenu();
 		return;
 	}
 
-	// 숫자 입력 처리
-	auto discovered = nav->GetDiscoveredRegions();
-	int choice = input - '1';
+	// 숫자, 공백, 마이너스 입력 처리
+	if ((input >= '0' && input <= '9') || input == ' ' || input == '-') {
+		navigationInputBuffer += input;
+		std::print("{}", input);
+		return;
+	}
 
-	if (choice >= 0 && choice < static_cast<int>(discovered.size())) {
-		int regionId = discovered[choice]->id;
-		if (nav->SetDestination(regionId)) {
-			const MapRegion* dest = nav->GetRegion(regionId);
-			std::string logMsg = std::format("[항로] {}로 목적지 설정 (각도: {}°, 예상 {}일)",
-				dest->name, nav->GetRequiredAngle(), nav->GetCurrentRoute().daysRequired);
+	// 백스페이스
+	if (input == 8 && !navigationInputBuffer.empty()) {
+		navigationInputBuffer.pop_back();
+		std::print("\b \b");
+		return;
+	}
+
+	// Enter로 좌표 확정
+	if (input == '\r' && !navigationInputBuffer.empty()) {
+		// 좌표 파싱 (X Y 형식)
+		std::stringstream ss(navigationInputBuffer);
+		int targetX, targetY;
+
+		if (ss >> targetX >> targetY) {
+			// 좌표 범위 체크
+			if (targetX < 0 || targetX > 1000 || targetY < 0 || targetY > 1000) {
+				std::println("\n  좌표 범위 오류! (0~1000 사이 값을 입력하세요)");
+				navigationInputBuffer.clear();
+				std::this_thread::sleep_for(std::chrono::milliseconds(800));
+				system("cls");
+				DisplayNavigationMenu();
+				return;
+			}
+
+			// 목표 좌표 설정
+			nav->SetTargetCoordinates(targetX, targetY);
+			const Route& route = nav->GetTargetRoute();
+
+			std::string logMsg = std::format("[항로] 목표 좌표 ({}, {}) 설정 - 필요 각도: {}°, 예상 거리: {}, 예상 {}일",
+				targetX, targetY, route.requiredAngle, route.totalDistance, route.estimatedDays);
 			dayLog.push_back(logMsg);
 
-			std::println("\n  >> {}로 목적지가 설정되었습니다.", dest->name);
-			std::println("     하부구동부에서 각도를 {}°로 맞춰주세요.", nav->GetRequiredAngle());
+			std::println("");
+			std::println("");
+			std::println("  ════════════════════════════════════════");
+			std::println("  목표 좌표: ({}, {})", targetX, targetY);
+			std::println("  필요 각도: {}°", route.requiredAngle);
+			std::println("  예상 거리: {} 단위", route.totalDistance);
+			std::println("  예상 소요: {}일", route.estimatedDays);
+			std::println("  ════════════════════════════════════════");
+			std::println("");
+			std::println("  ※ 하부구동부에서 각도를 {}°로 설정해야 합니다.", route.requiredAngle);
+			std::println("  ※ 현재 각도: {}°", nav->GetMovementAngle());
+			std::println("");
+
+			navigationInputBuffer.clear();
+			std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+			system("cls");
+			DisplayNavigationMenu();
 		}
 		else {
-			std::println("\n  해당 지역으로 경로를 설정할 수 없습니다.");
+			std::println("\n  입력 형식 오류! (예: 750 320)");
+			navigationInputBuffer.clear();
+			std::this_thread::sleep_for(std::chrono::milliseconds(800));
+			system("cls");
+			DisplayNavigationMenu();
 		}
-		DisplayNavigationMenu();
+		return;
 	}
 }
 
@@ -1765,35 +1893,35 @@ void GameScene::DisplayAngleMenu()
 	Navigation* nav = world->GetNavigation();
 
 	std::println("");
-	std::println("  ══════════════ [하부구동부 - 각도 조정] ══════════════");
+	std::println("  ══════════════ [하부구동부 - 이동 각도 설정] ══════════════");
 	std::println("");
 
-	// 현재 항행 상태
-	DisplayNavigationStatus();
-
-	// 각도 조정 UI
-	std::println("  [각도 조정]");
-	std::println("  현재 각도: {}°", nav->GetMovementAngle());
-
-	if (nav->HasActiveRoute()) {
-		std::println("  필요 각도: {}°", nav->GetRequiredAngle());
-		if (nav->IsAngleCorrect()) {
-			std::println("  >> 각도가 정확합니다. 이동 중...");
-		}
-		else {
-			int diff = nav->GetRequiredAngle() - nav->GetMovementAngle();
-			if (diff > 180) diff -= 360;
-			if (diff < -180) diff += 360;
-			std::println("  >> 조정 필요: {}° {}", std::abs(diff),
-				diff > 0 ? "(시계방향)" : "(반시계방향)");
-		}
-	}
-	else {
-		std::println("  목적지가 설정되지 않았습니다.");
-	}
-
+	// 현재 위치 정보
+	std::println("  현재 위치: ({}, {})", nav->GetCurrentX(), nav->GetCurrentY());
+	std::println("  현재 지형: {}", GetTerrainName(nav->GetCurrentTerrain()));
+	std::println("  총 이동 일수: {}일", nav->GetTraveledDays());
 	std::println("");
-	std::println("  [←/→] 1° 조정  [A/D] 10° 조정  [숫자 입력] 직접 설정");
+
+	// 각도 설정 UI (목적지 정보 없음)
+	std::println("  ┌──────────────────────────────────────┐");
+	std::println("  │      현재 이동 각도: {:>3}°            │", nav->GetMovementAngle());
+	std::println("  └──────────────────────────────────────┘");
+	std::println("");
+
+	// 방향 안내
+	std::println("          0° (북)");
+	std::println("            │");
+	std::println("   270° ────┼──── 90°");
+	std::println("   (서)     │     (동)");
+	std::println("          180°");
+	std::println("          (남)");
+	std::println("");
+
+	std::println("  도시는 매일 설정된 각도 방향으로 이동합니다.");
+	std::println("  조타실에서 계산한 필요 각도를 여기서 입력하세요.");
+	std::println("");
+	std::println("  [←/→] 1° 조정  [A/D] 10° 조정");
+	std::println("  숫자 입력 후 Enter: 직접 설정");
 	std::println("  [ESC] 닫기");
 	std::print("  > ");
 }
@@ -1810,7 +1938,7 @@ void GameScene::HandleAngleInput(char input)
 		system("cls");
 		DisplayDayStart();
 		for (const auto& d : dayLog) {
-			std::println("    \"{}\"", d);
+			std::println("    \"{}\"\n", d);
 		}
 		return;
 	}

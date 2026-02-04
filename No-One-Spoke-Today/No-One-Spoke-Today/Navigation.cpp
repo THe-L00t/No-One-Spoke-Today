@@ -11,7 +11,7 @@
 // ============================================================
 Navigation::Navigation()
 	: currentX(500), currentY(500)  // 맵 중앙에서 시작
-	, currentAngle(0), travelProgress(0)
+	, currentAngle(0), traveledDays(0)
 	, inMaintenance(false), maintenanceDaysLeft(0)
 	, rng(std::random_device{}())
 {
@@ -252,104 +252,96 @@ std::vector<const MapRegion*> Navigation::GetDiscoveredRegions() const {
 
 
 // ============================================================
-// 경로 설정 (조타실)
+// 경로 계산 (조타실) - 정보 제공만
 // ============================================================
-bool Navigation::SetDestination(int regionId) {
-	const MapRegion* dest = GetRegion(regionId);
-	if (!dest || !dest->discovered) {
-		return false;  // 발견되지 않은 지역
-	}
+Route Navigation::CalculateRoute(int targetX, int targetY) const {
+	Route route;
+	route.targetX = targetX;
+	route.targetY = targetY;
+	route.totalDistance = CalculateDistance(currentX, currentY, targetX, targetY);
+	route.requiredAngle = CalculateAngle(currentX, currentY, targetX, targetY);
 
-	activeRoute.destinationId = regionId;
-	activeRoute.totalDistance = CalculateDistance(currentX, currentY, dest->x, dest->y);
-	activeRoute.requiredAngle = CalculateAngle(currentX, currentY, dest->x, dest->y);
-	activeRoute.daysRequired = CalculateDaysRequired(activeRoute.totalDistance, dest->terrain);
+	// 경로상 지형 고려하여 예상 일수 계산
+	TerrainType terrain = GetTerrainAtPosition(targetX, targetY);
+	route.estimatedDays = CalculateDaysRequired(route.totalDistance, terrain);
+	route.isSet = true;
 
-	travelProgress = 0;
-
-	return true;
+	return route;
 }
 
-void Navigation::CancelRoute() {
-	activeRoute.destinationId = -1;
-	activeRoute.totalDistance = 0;
-	activeRoute.daysRequired = 0;
-	activeRoute.requiredAngle = 0;
-	travelProgress = 0;
+void Navigation::SetTargetCoordinates(int targetX, int targetY) {
+	targetRoute = CalculateRoute(targetX, targetY);
+}
+
+void Navigation::ClearTarget() {
+	targetRoute = Route();
 }
 
 
 // ============================================================
-// 각도 설정 (하부구동부)
+// 각도 설정 (하부구동부) - 실제 이동 방향 변경
 // ============================================================
 void Navigation::SetMovementAngle(int angle) {
 	currentAngle = ((angle % 360) + 360) % 360;  // 0-359 범위로 정규화
 }
 
-bool Navigation::IsAngleCorrect(int tolerance) const {
-	if (!HasActiveRoute()) return false;
-
-	int diff = std::abs(currentAngle - activeRoute.requiredAngle);
-	if (diff > 180) diff = 360 - diff;  // 각도 차이 최소화
-
-	return diff <= tolerance;
-}
-
 
 // ============================================================
-// 이동 처리
+// 이동 처리 (매일 현재 각도 방향으로 이동)
 // ============================================================
 void Navigation::UpdateTravel() {
-	if (!HasActiveRoute()) return;
-	if (!IsAngleCorrect()) return;  // 각도가 맞지 않으면 이동 안 함
+	using namespace TerrainBalance;
 
-	travelProgress++;
+	if (inMaintenance) return;
 
-	// 위치 업데이트 (목적지 방향으로 이동)
-	const MapRegion* dest = GetRegion(activeRoute.destinationId);
-	if (dest) {
-		float progress = static_cast<float>(travelProgress) / activeRoute.daysRequired;
-		progress = std::min(progress, 1.0f);
+	// 현재 지형의 속도 보정
+	TerrainType terrain = GetCurrentTerrain();
+	float speedMod = GetTerrainSpeedMod(terrain);
 
-		int startX = currentX;
-		int startY = currentY;
+	// 하루 이동 거리 계산
+	int dailyDistance = static_cast<int>(DISTANCE_PER_DAY * speedMod);
 
-		// 이동 시작 위치에서 목적지까지 보간
-		// (실제로는 경로 시작 시점의 위치를 저장해야 하지만 간단하게 구현)
-		if (progress < 1.0f) {
-			float invProgress = 1.0f - progress;
-			// currentX, currentY는 이동 중간 위치로 업데이트하지 않음
-			// 도착 시에만 업데이트
+	// 현재 각도 방향으로 이동
+	MoveInDirection(currentAngle, dailyDistance);
+
+	traveledDays++;
+}
+
+void Navigation::MoveInDirection(int angle, int distance) {
+	using namespace TerrainBalance;
+
+	// 각도를 라디안으로 변환 (북쪽 = 0도, 시계방향)
+	double radians = angle * M_PI / 180.0;
+
+	// 이동량 계산
+	int dx = static_cast<int>(std::sin(radians) * distance);
+	int dy = static_cast<int>(std::cos(radians) * distance);
+
+	// 새 위치 계산 (맵 범위 제한)
+	currentX = std::clamp(currentX + dx, MAP_MIN, MAP_MAX);
+	currentY = std::clamp(currentY + dy, MAP_MIN, MAP_MAX);
+}
+
+int Navigation::CheckNearbyRegion(int proximityThreshold) const {
+	for (const auto& region : regions) {
+		int dist = CalculateDistance(currentX, currentY, region.x, region.y);
+		if (dist <= proximityThreshold) {
+			return region.id;
 		}
 	}
+	return -1;
 }
 
-int Navigation::GetRemainingDays() const {
-	if (!HasActiveRoute()) return 0;
-	return std::max(0, activeRoute.daysRequired - travelProgress);
-}
+void Navigation::OnRegionArrival(int regionId) {
+	MapRegion* region = GetRegion(regionId);
+	if (region) {
+		region->discovered = true;
+		region->visited = true;
 
-bool Navigation::HasArrived() const {
-	if (!HasActiveRoute()) return false;
-	return travelProgress >= activeRoute.daysRequired;
-}
-
-void Navigation::CompleteArrival() {
-	if (!HasArrived()) return;
-
-	const MapRegion* dest = GetRegion(activeRoute.destinationId);
-	if (dest) {
-		currentX = dest->x;
-		currentY = dest->y;
-
-		// 방문 표시
-		MapRegion* destMut = GetRegion(activeRoute.destinationId);
-		if (destMut) {
-			destMut->visited = true;
-		}
+		// 해당 지역 좌표로 위치 보정
+		currentX = region->x;
+		currentY = region->y;
 	}
-
-	CancelRoute();
 }
 
 
@@ -428,12 +420,12 @@ float Navigation::GetTemperatureModifier(float factor) const {
 	float excess = diff - COMFORT_RANGE;
 	float modifier = 1.0f + (excess * excess) * factor * 0.001f;
 
-	return std::min(modifier, 2.0f);  // 최대 2배 제한
+	return (std::min)(modifier, 2.0f);  // 최대 2배 제한
 }
 
 
 // ============================================================
-// 힌트 시스템
+// 힌트 시스템 (좌표 기반)
 // ============================================================
 LocationHint Navigation::GenerateHint(int regionId, bool exact) {
 	LocationHint hint;
@@ -463,7 +455,8 @@ LocationHint Navigation::GenerateHint(int regionId, bool exact) {
 		else if (region->x < currentX - 100) direction += "서";
 		if (direction.empty()) direction = "근처";
 
-		hint.description = region->name + "은(는) 대략 " + direction + "쪽에 있다고 합니다.";
+		hint.description = direction + "쪽 어딘가, 대략 (" +
+			std::to_string(hint.approximateX) + ", " + std::to_string(hint.approximateY) + ") 부근";
 	}
 
 	return hint;
@@ -476,55 +469,79 @@ void Navigation::DiscoverRegion(int regionId) {
 	}
 }
 
-bool Navigation::TryDiscoverHintDuringTravel() {
+std::pair<bool, LocationHint> Navigation::TryDiscoverHintDuringTravel() {
 	using namespace TerrainBalance;
 
 	std::uniform_real_distribution<float> chanceDist(0.0f, 1.0f);
 	if (chanceDist(rng) > HINT_CHANCE_TRAVEL) {
-		return false;
+		return { false, LocationHint() };
 	}
 
-	// 미발견 지역 중 하나 선택
-	std::vector<int> undiscovered;
+	// 아직 힌트를 얻지 못한 지역 중 하나 선택
+	std::vector<int> undiscoveredIds;
 	for (const auto& r : regions) {
-		if (!r.discovered) {
-			undiscovered.push_back(r.id);
+		// 이미 힌트 목록에 있는지 확인
+		bool alreadyHinted = false;
+		for (const auto& h : discoveredHints) {
+			if (h.regionId == r.id) {
+				alreadyHinted = true;
+				break;
+			}
+		}
+		if (!alreadyHinted && !r.visited) {
+			undiscoveredIds.push_back(r.id);
 		}
 	}
 
-	if (undiscovered.empty()) return false;
+	if (undiscoveredIds.empty()) return { false, LocationHint() };
 
-	std::uniform_int_distribution<size_t> regionDist(0, undiscovered.size() - 1);
-	int selectedId = undiscovered[regionDist(rng)];
+	std::uniform_int_distribution<size_t> regionDist(0, undiscoveredIds.size() - 1);
+	int selectedId = undiscoveredIds[regionDist(rng)];
 
-	// 발견!
-	DiscoverRegion(selectedId);
-	return true;
+	// 힌트 생성 및 저장
+	LocationHint hint = GenerateHint(selectedId, false);  // 대략적 좌표
+	discoveredHints.push_back(hint);
+
+	return { true, hint };
 }
 
-bool Navigation::TryDiscoverHintFromDialogue() {
+std::pair<bool, LocationHint> Navigation::TryDiscoverHintFromDialogue() {
 	using namespace TerrainBalance;
 
 	std::uniform_real_distribution<float> chanceDist(0.0f, 1.0f);
 	if (chanceDist(rng) > HINT_CHANCE_DIALOGUE) {
-		return false;
+		return { false, LocationHint() };
 	}
 
-	// 미발견 지역 중 하나 선택
-	std::vector<int> undiscovered;
+	// 아직 힌트를 얻지 못한 지역 중 하나 선택
+	std::vector<int> undiscoveredIds;
 	for (const auto& r : regions) {
-		if (!r.discovered) {
-			undiscovered.push_back(r.id);
+		bool alreadyHinted = false;
+		for (const auto& h : discoveredHints) {
+			if (h.regionId == r.id) {
+				alreadyHinted = true;
+				break;
+			}
+		}
+		if (!alreadyHinted && !r.visited) {
+			undiscoveredIds.push_back(r.id);
 		}
 	}
 
-	if (undiscovered.empty()) return false;
+	if (undiscoveredIds.empty()) return { false, LocationHint() };
 
-	std::uniform_int_distribution<size_t> regionDist(0, undiscovered.size() - 1);
-	int selectedId = undiscovered[regionDist(rng)];
+	std::uniform_int_distribution<size_t> regionDist(0, undiscoveredIds.size() - 1);
+	int selectedId = undiscoveredIds[regionDist(rng)];
 
-	DiscoverRegion(selectedId);
-	return true;
+	// 힌트 생성 및 저장
+	LocationHint hint = GenerateHint(selectedId, false);
+	discoveredHints.push_back(hint);
+
+	return { true, hint };
+}
+
+std::vector<LocationHint> Navigation::GetDiscoveredHints() const {
+	return discoveredHints;
 }
 
 
@@ -536,13 +553,14 @@ void Navigation::SaveState(std::ofstream& out) const {
 	out.write(reinterpret_cast<const char*>(&currentX), sizeof(currentX));
 	out.write(reinterpret_cast<const char*>(&currentY), sizeof(currentY));
 
-	// 경로 상태
-	out.write(reinterpret_cast<const char*>(&activeRoute.destinationId), sizeof(activeRoute.destinationId));
-	out.write(reinterpret_cast<const char*>(&activeRoute.totalDistance), sizeof(activeRoute.totalDistance));
-	out.write(reinterpret_cast<const char*>(&activeRoute.daysRequired), sizeof(activeRoute.daysRequired));
-	out.write(reinterpret_cast<const char*>(&activeRoute.requiredAngle), sizeof(activeRoute.requiredAngle));
+	// 이동 상태
 	out.write(reinterpret_cast<const char*>(&currentAngle), sizeof(currentAngle));
-	out.write(reinterpret_cast<const char*>(&travelProgress), sizeof(travelProgress));
+	out.write(reinterpret_cast<const char*>(&traveledDays), sizeof(traveledDays));
+
+	// 목표 좌표
+	out.write(reinterpret_cast<const char*>(&targetRoute.targetX), sizeof(targetRoute.targetX));
+	out.write(reinterpret_cast<const char*>(&targetRoute.targetY), sizeof(targetRoute.targetY));
+	out.write(reinterpret_cast<const char*>(&targetRoute.isSet), sizeof(targetRoute.isSet));
 
 	// 정비 상태
 	out.write(reinterpret_cast<const char*>(&inMaintenance), sizeof(inMaintenance));
@@ -559,6 +577,21 @@ void Navigation::SaveState(std::ofstream& out) const {
 		out.write(reinterpret_cast<const char*>(&r.discovered), sizeof(r.discovered));
 		out.write(reinterpret_cast<const char*>(&r.visited), sizeof(r.visited));
 	}
+
+	// 발견된 힌트 목록
+	uint32_t hintCount = static_cast<uint32_t>(discoveredHints.size());
+	out.write(reinterpret_cast<const char*>(&hintCount), sizeof(hintCount));
+
+	for (const auto& hint : discoveredHints) {
+		out.write(reinterpret_cast<const char*>(&hint.regionId), sizeof(hint.regionId));
+		out.write(reinterpret_cast<const char*>(&hint.approximateX), sizeof(hint.approximateX));
+		out.write(reinterpret_cast<const char*>(&hint.approximateY), sizeof(hint.approximateY));
+		out.write(reinterpret_cast<const char*>(&hint.isExact), sizeof(hint.isExact));
+
+		uint32_t descLen = static_cast<uint32_t>(hint.description.size());
+		out.write(reinterpret_cast<const char*>(&descLen), sizeof(descLen));
+		out.write(hint.description.data(), descLen);
+	}
 }
 
 void Navigation::LoadState(std::ifstream& in) {
@@ -566,13 +599,19 @@ void Navigation::LoadState(std::ifstream& in) {
 	in.read(reinterpret_cast<char*>(&currentX), sizeof(currentX));
 	in.read(reinterpret_cast<char*>(&currentY), sizeof(currentY));
 
-	// 경로 상태
-	in.read(reinterpret_cast<char*>(&activeRoute.destinationId), sizeof(activeRoute.destinationId));
-	in.read(reinterpret_cast<char*>(&activeRoute.totalDistance), sizeof(activeRoute.totalDistance));
-	in.read(reinterpret_cast<char*>(&activeRoute.daysRequired), sizeof(activeRoute.daysRequired));
-	in.read(reinterpret_cast<char*>(&activeRoute.requiredAngle), sizeof(activeRoute.requiredAngle));
+	// 이동 상태
 	in.read(reinterpret_cast<char*>(&currentAngle), sizeof(currentAngle));
-	in.read(reinterpret_cast<char*>(&travelProgress), sizeof(travelProgress));
+	in.read(reinterpret_cast<char*>(&traveledDays), sizeof(traveledDays));
+
+	// 목표 좌표
+	in.read(reinterpret_cast<char*>(&targetRoute.targetX), sizeof(targetRoute.targetX));
+	in.read(reinterpret_cast<char*>(&targetRoute.targetY), sizeof(targetRoute.targetY));
+	in.read(reinterpret_cast<char*>(&targetRoute.isSet), sizeof(targetRoute.isSet));
+
+	// 목표가 설정되어 있으면 경로 재계산
+	if (targetRoute.isSet) {
+		targetRoute = CalculateRoute(targetRoute.targetX, targetRoute.targetY);
+	}
 
 	// 정비 상태
 	in.read(reinterpret_cast<char*>(&inMaintenance), sizeof(inMaintenance));
@@ -601,6 +640,28 @@ void Navigation::LoadState(std::ifstream& in) {
 			in.read(reinterpret_cast<char*>(&dummy), sizeof(dummy));
 			in.read(reinterpret_cast<char*>(&dummyBool), sizeof(dummyBool));
 			in.read(reinterpret_cast<char*>(&dummyBool), sizeof(dummyBool));
+		}
+	}
+
+	// 발견된 힌트 목록 로드
+	discoveredHints.clear();
+	if (in.peek() != EOF) {
+		uint32_t hintCount = 0;
+		in.read(reinterpret_cast<char*>(&hintCount), sizeof(hintCount));
+
+		for (uint32_t i = 0; i < hintCount && in.good(); ++i) {
+			LocationHint hint;
+			in.read(reinterpret_cast<char*>(&hint.regionId), sizeof(hint.regionId));
+			in.read(reinterpret_cast<char*>(&hint.approximateX), sizeof(hint.approximateX));
+			in.read(reinterpret_cast<char*>(&hint.approximateY), sizeof(hint.approximateY));
+			in.read(reinterpret_cast<char*>(&hint.isExact), sizeof(hint.isExact));
+
+			uint32_t descLen = 0;
+			in.read(reinterpret_cast<char*>(&descLen), sizeof(descLen));
+			hint.description.resize(descLen);
+			in.read(hint.description.data(), descLen);
+
+			discoveredHints.push_back(hint);
 		}
 	}
 }
@@ -634,5 +695,5 @@ int Navigation::CalculateDaysRequired(int distance, TerrainType terrain) const {
 	float effectiveDistance = distance / speedMod;
 
 	int days = static_cast<int>(std::ceil(effectiveDistance / DISTANCE_PER_DAY));
-	return std::max(1, days);  // 최소 1일
+	return (std::max)(1, days);  // 최소 1일
 }

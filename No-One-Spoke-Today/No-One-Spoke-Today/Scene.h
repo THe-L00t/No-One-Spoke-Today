@@ -92,9 +92,9 @@ private:
 	void HandleCitizenInfoArrow(int dir);
 
 	// 네비게이션 관련 함수
-	void DisplayNavigationMenu();    // 조타실: 목적지 설정
+	void DisplayNavigationMenu();    // 조타실: 좌표 입력으로 항로 계산
 	void HandleNavigationInput(char input);
-	void DisplayAngleMenu();         // 하부구동부: 각도 설정
+	void DisplayAngleMenu();         // 하부구동부: 실제 이동 각도 설정
 	void HandleAngleInput(char input);
 	void DisplayNavigationStatus();  // 현재 항행 상태 표시
 
@@ -119,10 +119,11 @@ private:
 	bool showingMoveMenu{ false };
 	bool showingRegionMap{ false };
 	bool showingCitizenInfo{ false };
-	bool showingNavigationMenu{ false };  // 조타실: 목적지 설정
+	bool showingNavigationMenu{ false };  // 조타실: 좌표 입력
 	bool showingAngleMenu{ false };       // 하부구동부: 각도 설정
 	int citizenInfoMode{ 0 };  // 0: 성향, 1: 누적값, 2: 상태
 	int angleInputBuffer{ 0 }; // 각도 입력 버퍼
+	std::string navigationInputBuffer;   // 좌표 입력 버퍼
 	std::default_random_engine rng{ std::random_device{}() };
 };
 
