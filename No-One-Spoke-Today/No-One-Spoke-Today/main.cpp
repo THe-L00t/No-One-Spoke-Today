@@ -4,6 +4,29 @@
 
 // 콘솔 초기화 함수
 void InitConsole() {
+	// 콘솔 제목 설정
+	SetConsoleTitleW(L"No One Spoke Today");
+
+	// 콘솔창 아이콘 설정
+	HWND consoleWnd = GetConsoleWindow();
+	if (consoleWnd) {
+		// EXE 기준 경로로 아이콘 로드
+		std::string iconPath = GetFullPath("resource\\Icon.ico");
+		std::wstring wIconPath(iconPath.begin(), iconPath.end());
+
+		HICON hIcon = (HICON)LoadImageW(
+			NULL,
+			wIconPath.c_str(),
+			IMAGE_ICON,
+			0, 0,
+			LR_LOADFROMFILE | LR_DEFAULTSIZE
+		);
+		if (hIcon) {
+			SendMessage(consoleWnd, WM_SETICON, ICON_SMALL, (LPARAM)hIcon);
+			SendMessage(consoleWnd, WM_SETICON, ICON_BIG, (LPARAM)hIcon);
+		}
+	}
+
 	// UTF-8 입출력 설정
 	SetConsoleOutputCP(CP_UTF8);
 	SetConsoleCP(CP_UTF8);
@@ -34,7 +57,7 @@ int main() {
 	InitConsole();
 
 	std::string ASCII_image;
-	LoadText(ASCII_image, "titleASCIIart.txt");
+	LoadText(ASCII_image, "data/titleASCIIart.txt");
 	std::cout << ASCII_image << std::endl;
 
 	Framework game;

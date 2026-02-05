@@ -1,6 +1,10 @@
 #pragma once
 #include "pch.h"
 
+// EXE 파일 기준 경로 반환
+std::string GetExeDirectory();
+std::string GetFullPath(const std::string& relativePath);
+
 size_t utf8_char_length(unsigned char c);
 void typewriter_print(const std::string& text, int delay_ms = 40);
 void LoadText(std::string&,const std::string&);

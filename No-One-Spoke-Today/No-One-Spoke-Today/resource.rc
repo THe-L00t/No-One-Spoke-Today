@@ -1,0 +1,2 @@
+// 리소스 파일 - EXE 아이콘 설정
+IDI_ICON1 ICON "resource\\Icon.ico"

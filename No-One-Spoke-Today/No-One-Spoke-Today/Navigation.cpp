@@ -1,4 +1,5 @@
 #include "Navigation.h"
+#include "Toolkit.h"
 #include <cmath>
 #include <sstream>
 
@@ -25,6 +26,7 @@ void Navigation::Initialize() {
 	LoadRegionData("data/regions.txt");
 	RandomizeRegionPositions();
 	InitializeSanctuary();
+	LoadHintMessages("data/hint_messages.txt");
 }
 
 void Navigation::InitializeSanctuary() {
@@ -60,7 +62,8 @@ void Navigation::InitializeSanctuary() {
 }
 
 void Navigation::LoadRegionData(const std::string& filepath) {
-	std::ifstream in(filepath);
+	std::string fullPath = GetFullPath(filepath);
+	std::ifstream in(fullPath);
 	if (!in) {
 		// 파일이 없으면 기본 지역 생성
 		regions.clear();
@@ -669,9 +672,9 @@ std::pair<bool, LocationHint> Navigation::TryDiscoverHintOnEvent() {
 
 	// 5% 확률로 최종 목적지 힌트
 	if (chanceDist(rng) < SANCTUARY_HINT_CHANCE) {
-		// 최종 목적지 힌트
 		UpgradeSanctuaryHint();
 		LocationHint hint = GenerateSanctuaryHint();
+		hint.discoveryMessage = GetRandomDiscoveryMessage();
 		pendingHintNotifications.push_back(hint);
 		return { true, hint };
 	}
@@ -681,7 +684,7 @@ std::pair<bool, LocationHint> Navigation::TryDiscoverHintOnEvent() {
 	for (const auto& r : regions) {
 		bool alreadyHinted = false;
 		for (const auto& h : discoveredHints) {
-			if (!h.isSanctuary && h.regionId == r.id) {
+			if (!h.isSanctuary && h.regionId == r.id && h.hintType == HintType::Coordinate) {
 				alreadyHinted = true;
 				break;
 			}
@@ -695,17 +698,73 @@ std::pair<bool, LocationHint> Navigation::TryDiscoverHintOnEvent() {
 		// 지역 힌트가 없으면 최종 목적지 힌트로 대체
 		UpgradeSanctuaryHint();
 		LocationHint hint = GenerateSanctuaryHint();
+		hint.discoveryMessage = GetRandomDiscoveryMessage();
 		pendingHintNotifications.push_back(hint);
 		return { true, hint };
 	}
 
+	// 지역 선택
 	std::uniform_int_distribution<size_t> regionDist(0, undiscoveredIds.size() - 1);
 	int selectedId = undiscoveredIds[regionDist(rng)];
+	const MapRegion* region = GetRegion(selectedId);
+	if (!region) return { false, LocationHint() };
 
-	LocationHint hint = GenerateHint(selectedId, false);
-	discoveredHints.push_back(hint);
+	// 힌트 유형 랜덤 선택 (좌표 40%, 방향 35%, 특성 25%)
+	std::uniform_int_distribution<int> typeDist(0, 99);
+	int typeRoll = typeDist(rng);
+	HintType hintType;
+	if (typeRoll < 40) {
+		hintType = HintType::Coordinate;
+	}
+	else if (typeRoll < 75) {
+		hintType = HintType::Direction;
+	}
+	else {
+		hintType = HintType::Characteristic;
+	}
+
+	// 힌트 생성
+	LocationHint hint;
+	hint.regionId = selectedId;
+	hint.regionName = region->name;
+	hint.hintType = hintType;
+	hint.isSanctuary = false;
+	hint.discoveryMessage = GetRandomDiscoveryMessage();
+
+	switch (hintType) {
+	case HintType::Coordinate: {
+		// 대략적 좌표 (±50 오차)
+		std::uniform_int_distribution<int> errorDist(-50, 50);
+		hint.approximateX = region->x + errorDist(rng);
+		hint.approximateY = region->y + errorDist(rng);
+		hint.isExact = false;
+		hint.description = FormatHintMessage(HintType::Coordinate, region->name,
+			hint.approximateX, hint.approximateY, 0, "");
+
+		// 좌표 힌트만 지역 발견 처리
+		DiscoverRegion(selectedId);
+		discoveredHints.push_back(hint);
+		break;
+	}
+	case HintType::Direction: {
+		// 현재 위치에서 지역까지의 각도
+		hint.directionAngle = CalculateAngle(currentX, currentY, region->x, region->y);
+		hint.description = FormatHintMessage(HintType::Direction, region->name,
+			0, 0, hint.directionAngle, "");
+		// 방향 힌트는 지역 발견 안됨
+		break;
+	}
+	case HintType::Characteristic: {
+		// 지형 특성
+		hint.terrainName = GetTerrainName(region->terrain);
+		hint.description = FormatHintMessage(HintType::Characteristic, region->name,
+			0, 0, 0, hint.terrainName);
+		// 특성 힌트는 지역 발견 안됨
+		break;
+	}
+	}
+
 	pendingHintNotifications.push_back(hint);
-
 	return { true, hint };
 }
 
@@ -713,10 +772,13 @@ LocationHint Navigation::GenerateSanctuaryHint() {
 	LocationHint hint;
 	hint.regionId = -1;  // 특수 ID
 	hint.isSanctuary = true;
+	hint.regionName = "안정지대";
+	hint.hintType = HintType::Coordinate;  // Sanctuary는 항상 좌표 타입
 
 	switch (sanctuary.hintLevel) {
 	case 1: {
 		// 방향만
+		hint.hintType = HintType::Direction;
 		std::string direction;
 		if (sanctuary.y > currentY + 100) direction += "북";
 		else if (sanctuary.y < currentY - 100) direction += "남";
@@ -724,7 +786,8 @@ LocationHint Navigation::GenerateSanctuaryHint() {
 		else if (sanctuary.x < currentX - 100) direction += "서";
 		if (direction.empty()) direction = "가까운 곳";
 
-		hint.description = "★ 안정지대는 " + direction + "쪽 어딘가에 있다...";
+		hint.directionAngle = CalculateAngle(currentX, currentY, sanctuary.x, sanctuary.y);
+		hint.description = "\"...★ 안정지대는 " + direction + "쪽 어딘가에 있다...\"";
 		hint.approximateX = 0;
 		hint.approximateY = 0;
 		hint.isExact = false;
@@ -736,8 +799,8 @@ LocationHint Navigation::GenerateSanctuaryHint() {
 		hint.approximateX = sanctuary.x + errorDist(rng);
 		hint.approximateY = sanctuary.y + errorDist(rng);
 		hint.isExact = false;
-		hint.description = "★ 안정지대는 대략 (" +
-			std::to_string(hint.approximateX) + ", " + std::to_string(hint.approximateY) + ") 부근";
+		hint.description = "\"...★ 안정지대는 대략 (" +
+			std::to_string(hint.approximateX) + ", " + std::to_string(hint.approximateY) + ") 부근...\"";
 		break;
 	}
 	case 3:
@@ -746,8 +809,8 @@ LocationHint Navigation::GenerateSanctuaryHint() {
 		hint.approximateX = sanctuary.x;
 		hint.approximateY = sanctuary.y;
 		hint.isExact = true;
-		hint.description = "★ 안정지대 정확한 위치: (" +
-			std::to_string(sanctuary.x) + ", " + std::to_string(sanctuary.y) + ")";
+		hint.description = "\"...★ 안정지대 정확한 위치: (" +
+			std::to_string(sanctuary.x) + ", " + std::to_string(sanctuary.y) + ")...\"";
 		break;
 	}
 	}
@@ -958,6 +1021,156 @@ int Navigation::CalculateDaysRequired(int distance, TerrainType terrain) const {
 	float speedMod = GetTerrainSpeedMod(terrain);
 	float effectiveDistance = distance / speedMod;
 
-	int days = static_cast<int>(std::ceil(effectiveDistance / DISTANCE_PER_DAY));
+	int days = static_cast<int>(std::ceil(effectiveDistance / BASE_SPEED));
 	return (std::max)(1, days);  // 최소 1일
+}
+
+
+// ============================================================
+// 힌트 메시지 시스템
+// ============================================================
+void Navigation::LoadHintMessages(const std::string& filepath) {
+	std::string fullPath = GetFullPath(filepath);
+	std::ifstream in(fullPath);
+
+	// 기본 메시지 설정 (파일 없을 때)
+	if (!in) {
+		// 쪽지 발견 대사 (15개)
+		discoveryMessages = {
+			"낡은 쪽지 한 장이 바람에 날려왔다.",
+			"누군가 남긴 기록을 발견했다.",
+			"희미한 글씨가 적힌 종이를 주웠다.",
+			"바닥에 떨어진 메모를 발견했다.",
+			"찢어진 일지의 한 페이지를 찾았다.",
+			"오래된 편지 조각이 눈에 띄었다.",
+			"먼지 쌓인 기록물을 발견했다.",
+			"누군가의 일기장 조각을 주웠다.",
+			"색이 바랜 종이쪽지를 찾았다.",
+			"벽에 붙어있던 메모가 떨어졌다.",
+			"과거 여행자의 기록을 발견했다.",
+			"접힌 종이 한 장이 발밑에 있었다.",
+			"손때 묻은 쪽지를 주웠다.",
+			"급하게 적은 듯한 메모를 발견했다.",
+			"오래된 지도 조각과 함께 쪽지가 있었다."
+		};
+
+		// 좌표 힌트 문구 (3개)
+		coordinateHintMessages = {
+			"\"...{name}의 좌표는 대략 ({x}, {y}) 부근이었다...\"",
+			"\"...위치를 기록해둔다. {name}: ({x}, {y}) 근처...\"",
+			"\"...{name}을(를) 찾았다. 좌표 ({x}, {y}) 부근에서 발견...\""
+		};
+
+		// 방향 힌트 문구 (3개)
+		directionHintMessages = {
+			"\"...{name}은(는) 여기서 {angle}도 방향에 있다고 했다...\"",
+			"\"...{angle}도 쪽으로 가면 {name}이(가) 있다던데...\"",
+			"\"...나침반 기준 {angle}도, 그곳에 {name}이(가)...\""
+		};
+
+		// 특성 힌트 문구 (3개)
+		characteristicHintMessages = {
+			"\"...가장 가까운 곳은 {terrain} 지역이라고 한다...\"",
+			"\"...근처에 {terrain} 특성의 장소가 있다더라...\"",
+			"\"...{terrain} 지형을 가진 {name}이(가) 멀지 않다...\""
+		};
+		return;
+	}
+
+	// 파일에서 로드
+	std::string line;
+	std::string currentSection;
+
+	while (std::getline(in, line)) {
+		// 주석이나 빈 줄 무시
+		if (line.empty() || line[0] == '#') continue;
+
+		// 섹션 헤더
+		if (line[0] == '[') {
+			size_t end = line.find(']');
+			if (end != std::string::npos) {
+				currentSection = line.substr(1, end - 1);
+			}
+			continue;
+		}
+
+		// 메시지 추가
+		if (currentSection == "DISCOVERY") {
+			discoveryMessages.push_back(line);
+		}
+		else if (currentSection == "HINT_COORDINATE") {
+			coordinateHintMessages.push_back(line);
+		}
+		else if (currentSection == "HINT_DIRECTION") {
+			directionHintMessages.push_back(line);
+		}
+		else if (currentSection == "HINT_CHARACTERISTIC") {
+			characteristicHintMessages.push_back(line);
+		}
+	}
+
+	// 빈 섹션 기본값 채우기
+	if (discoveryMessages.empty()) {
+		discoveryMessages.push_back("낡은 쪽지를 발견했다.");
+	}
+	if (coordinateHintMessages.empty()) {
+		coordinateHintMessages.push_back("\"...{name}: ({x}, {y}) 부근...\"");
+	}
+	if (directionHintMessages.empty()) {
+		directionHintMessages.push_back("\"...{name}: {angle}도 방향...\"");
+	}
+	if (characteristicHintMessages.empty()) {
+		characteristicHintMessages.push_back("\"...근처에 {terrain} 지역이 있다...\"");
+	}
+}
+
+std::string Navigation::GetRandomDiscoveryMessage() {
+	if (discoveryMessages.empty()) return "쪽지를 발견했다.";
+	std::uniform_int_distribution<size_t> dist(0, discoveryMessages.size() - 1);
+	return discoveryMessages[dist(rng)];
+}
+
+std::string Navigation::FormatHintMessage(HintType type, const std::string& name, int x, int y, int angle, const std::string& terrain) {
+	std::string message;
+
+	switch (type) {
+	case HintType::Coordinate: {
+		if (coordinateHintMessages.empty()) return "";
+		std::uniform_int_distribution<size_t> dist(0, coordinateHintMessages.size() - 1);
+		message = coordinateHintMessages[dist(rng)];
+		break;
+	}
+	case HintType::Direction: {
+		if (directionHintMessages.empty()) return "";
+		std::uniform_int_distribution<size_t> dist(0, directionHintMessages.size() - 1);
+		message = directionHintMessages[dist(rng)];
+		break;
+	}
+	case HintType::Characteristic: {
+		if (characteristicHintMessages.empty()) return "";
+		std::uniform_int_distribution<size_t> dist(0, characteristicHintMessages.size() - 1);
+		message = characteristicHintMessages[dist(rng)];
+		break;
+	}
+	}
+
+	// 플레이스홀더 치환
+	size_t pos;
+	while ((pos = message.find("{name}")) != std::string::npos) {
+		message.replace(pos, 6, name);
+	}
+	while ((pos = message.find("{x}")) != std::string::npos) {
+		message.replace(pos, 3, std::to_string(x));
+	}
+	while ((pos = message.find("{y}")) != std::string::npos) {
+		message.replace(pos, 3, std::to_string(y));
+	}
+	while ((pos = message.find("{angle}")) != std::string::npos) {
+		message.replace(pos, 7, std::to_string(angle));
+	}
+	while ((pos = message.find("{terrain}")) != std::string::npos) {
+		message.replace(pos, 9, terrain);
+	}
+
+	return message;
 }

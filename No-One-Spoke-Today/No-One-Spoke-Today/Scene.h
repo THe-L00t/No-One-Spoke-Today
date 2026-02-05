@@ -98,6 +98,9 @@ private:
 	void HandleAngleInput(char input);
 	void DisplayNavigationStatus();  // 현재 항행 상태 표시
 
+	// 힌트 표시 함수
+	void CheckAndDisplayHints();     // 대기 중인 힌트 체크 및 표시
+
 	World* world{ nullptr };
 
 	std::vector<std::string> dayLog;

@@ -7,8 +7,8 @@ std::string Scene::oldScene;
 
 void TitleScene::Enter(std::unique_ptr<World>&)
 {
-	LoadText(title, "title.txt");
-	LoadText(intro, "intro.txt");
+	LoadText(title, "data/title.txt");
+	LoadText(intro, "data/intro.txt");
 	system("cls");
 
 	if (firstVisit) {
@@ -260,6 +260,9 @@ void GameScene::HandleInput(char input)
 
 				// 선택 적용
 				em->ApplyPlayerChoice(choiceIndex, *world->GetCity(), world->GetHumansVector());
+
+				// 힌트 체크 및 표시 (이벤트 콜백으로 힌트가 생성되었을 수 있음)
+				CheckAndDisplayHints();
 
 				waitingForChoice = false;
 				eventDisplayed = false;
@@ -539,7 +542,7 @@ void SaveScene::sHandleInput(char input)
 void SaveScene::LoadMeta()
 {
 	saveList.clear();
-	std::ifstream in{ "data/savefile", std::ios::binary };
+	std::ifstream in{ GetFullPath("data/savefile"), std::ios::binary };
 	if (!in.is_open()) {
 		std::cout << "[DEBUG] data/savefile 파일을 열 수 없습니다." << std::endl;
 		return;
@@ -564,8 +567,8 @@ void SaveScene::LoadMeta()
 void SaveScene::SaveMeta()
 {
 	std::cout << "[DEBUG] SaveMeta 호출, saveList.size() = " << saveList.size() << std::endl;
-	CreateDirectoryA("data", NULL);
-	std::ofstream out{ "data/savefile", std::ios::binary | std::ios::trunc };
+	CreateDirectoryA(GetFullPath("data").c_str(), NULL);
+	std::ofstream out{ GetFullPath("data/savefile"), std::ios::binary | std::ios::trunc };
 	if (!out.is_open()) {
 		std::cout << "[DEBUG] data/savefile 쓰기 실패" << std::endl;
 		return;
@@ -590,7 +593,7 @@ void SaveScene::LoadWorld()
 	}
 
 	std::string fileName = foundSave[option].worldName;
-	std::ifstream in{ "data/" + fileName + ".bin", std::ios::binary };
+	std::ifstream in{ GetFullPath("data/" + fileName + ".bin"), std::ios::binary };
 	if (!in.is_open()) {
 		std::cout << "파일을 열 수 없습니다." << std::endl;
 		return;
@@ -747,11 +750,11 @@ void SaveScene::SaveWorld()
 	if (isOverwrite && existingSlotIndex >= 0) {
 		std::string oldFileName = saveList[existingSlotIndex].worldName;
 		if (oldFileName != fileName) {
-			std::remove(("data/" + oldFileName + ".bin").c_str());
+			std::remove(GetFullPath("data/" + oldFileName + ".bin").c_str());
 		}
 	}
 
-	std::ofstream out{ "data/" + fileName + ".bin", std::ios::binary };
+	std::ofstream out{ GetFullPath("data/" + fileName + ".bin"), std::ios::binary };
 	if (not out) return;
 
 	// 버전 (5: 하부구동부 지시 시스템 추가)
@@ -1875,7 +1878,7 @@ void GameScene::HandleNavigationInput(char input)
 		system("cls");
 		DisplayDayStart();
 		for (const auto& d : dayLog) {
-			std::println("    \"{}\"", d);
+			std::println("    \"{}\"\n", d);
 		}
 		return;
 	}
@@ -2289,3 +2292,62 @@ void GameScene::HandleAngleInput(char input)
 
 // 방향키 처리를 위한 sHandleInput에서 각도 조정
 // Scene.cpp의 sHandleInput 함수 내에서 처리
+
+// ============================================================
+// 힌트 표시 함수
+// ============================================================
+void GameScene::CheckAndDisplayHints() {
+	if (!world) return;
+
+	Navigation* nav = world->GetNavigation();
+	if (!nav) return;
+
+	// 대기 중인 힌트가 있는지 확인
+	if (!nav->HasPendingHintNotification()) return;
+
+	const auto& hints = nav->GetPendingHintNotifications();
+
+	for (const auto& hint : hints) {
+		std::println("");
+		std::println("    ========================================");
+
+		// 쪽지 발견 대사
+		if (!hint.discoveryMessage.empty()) {
+			std::println("    {}", hint.discoveryMessage);
+		}
+		else {
+			std::println("    낡은 쪽지를 발견했다.");
+		}
+
+		std::println("");
+
+		// 힌트 내용
+		std::println("    {}", hint.description);
+
+		std::println("    ========================================");
+		std::println("");
+
+		// dayLog에 기록
+		std::string logEntry;
+		if (hint.isSanctuary) {
+			logEntry = "[힌트] ★ 안정지대 정보 획득";
+		}
+		else {
+			switch (hint.hintType) {
+			case HintType::Coordinate:
+				logEntry = std::format("[힌트] {} - 좌표 정보 획득", hint.regionName);
+				break;
+			case HintType::Direction:
+				logEntry = std::format("[힌트] {} - 방향 정보 획득 ({}도)", hint.regionName, hint.directionAngle);
+				break;
+			case HintType::Characteristic:
+				logEntry = std::format("[힌트] {} 지형의 장소 정보 획득", hint.terrainName);
+				break;
+			}
+		}
+		dayLog.push_back(logEntry);
+	}
+
+	// 힌트 알림 클리어
+	nav->ClearPendingHintNotifications();
+}

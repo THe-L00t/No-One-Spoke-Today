@@ -214,18 +214,33 @@ struct Route {
 
 
 // ============================================================
+// 힌트 유형
+// ============================================================
+enum class HintType {
+	Coordinate,      // 좌표 제공 (지역 발견됨)
+	Direction,       // 방향 제공 (몇 도 방향)
+	Characteristic   // 특성 제공 (지형 정보)
+};
+
+// ============================================================
 // 위치 힌트 정보
 // ============================================================
 struct LocationHint {
 	int regionId;                // 힌트 대상 지역 (-1이면 Sanctuary)
-	std::string description;     // 힌트 설명
+	std::string discoveryMessage; // 쪽지 발견 대사
+	std::string description;     // 힌트 내용
 	int approximateX;            // 대략적 X (±50 오차)
 	int approximateY;            // 대략적 Y (±50 오차)
+	int directionAngle;          // 방향 힌트일 때 각도
+	std::string terrainName;     // 특성 힌트일 때 지형 이름
+	std::string regionName;      // 지역 이름
+	HintType hintType;           // 힌트 유형
 	bool isExact;                // 정확한 위치인지
 	bool isSanctuary;            // 최종 목적지 힌트인지
 
 	LocationHint()
-		: regionId(-1), approximateX(0), approximateY(0), isExact(false), isSanctuary(false)
+		: regionId(-1), approximateX(0), approximateY(0), directionAngle(0)
+		, hintType(HintType::Coordinate), isExact(false), isSanctuary(false)
 	{}
 };
 
@@ -369,6 +384,17 @@ private:
 	// 정비 상태
 	bool inMaintenance;
 	int maintenanceDaysLeft;
+
+	// 힌트 메시지 (외부 파일에서 로드)
+	std::vector<std::string> discoveryMessages;      // 쪽지 발견 대사
+	std::vector<std::string> coordinateHintMessages; // 좌표 힌트 문구
+	std::vector<std::string> directionHintMessages;  // 방향 힌트 문구
+	std::vector<std::string> characteristicHintMessages; // 특성 힌트 문구
+
+	// 힌트 메시지 로드
+	void LoadHintMessages(const std::string& filepath);
+	std::string GetRandomDiscoveryMessage();
+	std::string FormatHintMessage(HintType type, const std::string& name, int x, int y, int angle, const std::string& terrain);
 
 	// 랜덤
 	std::default_random_engine rng;

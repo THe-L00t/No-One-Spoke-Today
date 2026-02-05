@@ -1,13 +1,14 @@
 #include "Event.h"
 #include "City.h"
 #include "Human.h"
+#include "Toolkit.h"
 #include <sstream>
 #include <algorithm>
 #include <cctype>
 
 // 디버그 로그를 파일로 출력
 static std::ofstream& GetDebugLog() {
-	static std::ofstream debugLog("data/debug.log", std::ios::trunc);
+	static std::ofstream debugLog(GetFullPath("data/debug.log"), std::ios::trunc);
 	return debugLog;
 }
 #define EVENT_LOG(msg) { GetDebugLog() << msg << std::endl; GetDebugLog().flush(); }
@@ -233,9 +234,10 @@ EventManager::EventManager()
 
 // ========== 텍스트 파일에서 이벤트 정의 로드 ==========
 void EventManager::LoadEventDefsFromText(const std::string& filepath) {
-	std::ifstream in(filepath);
+	std::string fullPath = GetFullPath(filepath);
+	std::ifstream in(fullPath);
 	if (!in) {
-		std::cerr << "이벤트 파일을 열 수 없습니다: " << filepath << std::endl;
+		std::cerr << "이벤트 파일을 열 수 없습니다: " << fullPath << std::endl;
 		return;
 	}
 
@@ -350,7 +352,8 @@ void EventManager::LoadEventDefsFromText(const std::string& filepath) {
 
 // ========== 바이너리 저장 ==========
 void EventManager::SaveEventDefs(const std::string& filepath) const {
-	std::ofstream out(filepath, std::ios::binary);
+	std::string fullPath = GetFullPath(filepath);
+	std::ofstream out(fullPath, std::ios::binary);
 	if (!out) return;
 
 	uint32_t count = static_cast<uint32_t>(definitions.size());
@@ -418,7 +421,8 @@ void EventManager::SaveEventDefs(const std::string& filepath) const {
 
 // ========== 바이너리 로드 ==========
 void EventManager::LoadEventDefs(const std::string& filepath) {
-	std::ifstream in(filepath, std::ios::binary);
+	std::string fullPath = GetFullPath(filepath);
+	std::ifstream in(fullPath, std::ios::binary);
 	if (!in) return;
 
 	definitions.clear();
