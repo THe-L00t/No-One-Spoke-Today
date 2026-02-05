@@ -24,6 +24,39 @@ Navigation::Navigation()
 void Navigation::Initialize() {
 	LoadRegionData("data/regions.txt");
 	RandomizeRegionPositions();
+	InitializeSanctuary();
+}
+
+void Navigation::InitializeSanctuary() {
+	using namespace TerrainBalance;
+
+	// 맵 가장자리 쪽에 랜덤 배치 (중앙에서 멀리)
+	std::uniform_int_distribution<int> edgeDist(0, 3);  // 0=북, 1=동, 2=남, 3=서
+	std::uniform_int_distribution<int> posDist(100, 900);
+
+	int edge = edgeDist(rng);
+	switch (edge) {
+	case 0:  // 북쪽
+		sanctuary.x = posDist(rng);
+		sanctuary.y = std::uniform_int_distribution<int>(750, 950)(rng);
+		break;
+	case 1:  // 동쪽
+		sanctuary.x = std::uniform_int_distribution<int>(750, 950)(rng);
+		sanctuary.y = posDist(rng);
+		break;
+	case 2:  // 남쪽
+		sanctuary.x = posDist(rng);
+		sanctuary.y = std::uniform_int_distribution<int>(50, 250)(rng);
+		break;
+	case 3:  // 서쪽
+		sanctuary.x = std::uniform_int_distribution<int>(50, 250)(rng);
+		sanctuary.y = posDist(rng);
+		break;
+	}
+
+	sanctuary.hintLevel = 0;
+	sanctuary.discovered = false;
+	sanctuary.currentHint = "어딘가에 안정지대가 있다는 소문이 있다...";
 }
 
 void Navigation::LoadRegionData(const std::string& filepath) {
@@ -289,19 +322,55 @@ void Navigation::SetMovementAngle(int angle) {
 // ============================================================
 // 이동 처리 (매일 현재 각도 방향으로 이동)
 // ============================================================
+
+// 이동 속도 계산 (도시 상태 기반)
+int Navigation::CalculateDailySpeed(int cityActivity, int avgFatigue) const {
+	using namespace TerrainBalance;
+
+	// 기본 속도 40
+	float speed = BASE_SPEED;
+
+	// 활력 보정: (activity - 5000) / 5000 * 20 → -20 ~ +20
+	float activityMod = (cityActivity - 5000) / 5000.0f * ACTIVITY_SPEED_FACTOR;
+	speed += activityMod;
+
+	// 피로 보정: -(avgFatigue / 100) * 15 → 0 ~ -15
+	float fatigueMod = -(avgFatigue / 100.0f) * FATIGUE_SPEED_FACTOR;
+	speed += fatigueMod;
+
+	// 지형 보정
+	TerrainType terrain = GetCurrentTerrain();
+	float terrainMod = GetTerrainSpeedMod(terrain);
+	speed *= terrainMod;
+
+	// 최소/최대 제한
+	return static_cast<int>(std::clamp(speed, MIN_SPEED, MAX_SPEED));
+}
+
+// 도시 상태 기반 이동
+void Navigation::UpdateTravel(int cityActivity, int avgFatigue) {
+	if (inMaintenance) return;
+
+	// 도시 상태 기반 속도 계산
+	int dailyDistance = CalculateDailySpeed(cityActivity, avgFatigue);
+
+	// 현재 각도 방향으로 이동
+	MoveInDirection(currentAngle, dailyDistance);
+
+	traveledDays++;
+}
+
+// 기본 이동 (하위 호환용)
 void Navigation::UpdateTravel() {
 	using namespace TerrainBalance;
 
 	if (inMaintenance) return;
 
-	// 현재 지형의 속도 보정
+	// 기본 속도 사용
 	TerrainType terrain = GetCurrentTerrain();
 	float speedMod = GetTerrainSpeedMod(terrain);
+	int dailyDistance = static_cast<int>(BASE_SPEED * speedMod);
 
-	// 하루 이동 거리 계산
-	int dailyDistance = static_cast<int>(DISTANCE_PER_DAY * speedMod);
-
-	// 현재 각도 방향으로 이동
 	MoveInDirection(currentAngle, dailyDistance);
 
 	traveledDays++;
@@ -501,6 +570,7 @@ std::pair<bool, LocationHint> Navigation::TryDiscoverHintDuringTravel() {
 	// 힌트 생성 및 저장
 	LocationHint hint = GenerateHint(selectedId, false);  // 대략적 좌표
 	discoveredHints.push_back(hint);
+	pendingHintNotifications.push_back(hint);
 
 	return { true, hint };
 }
@@ -536,12 +606,143 @@ std::pair<bool, LocationHint> Navigation::TryDiscoverHintFromDialogue() {
 	// 힌트 생성 및 저장
 	LocationHint hint = GenerateHint(selectedId, false);
 	discoveredHints.push_back(hint);
+	pendingHintNotifications.push_back(hint);
 
 	return { true, hint };
 }
 
 std::vector<LocationHint> Navigation::GetDiscoveredHints() const {
 	return discoveredHints;
+}
+
+
+// ============================================================
+// 이벤트 발생 시 힌트 시스템 (50% 확률, 그 중 5% 최종목적지)
+// ============================================================
+std::pair<bool, LocationHint> Navigation::TryDiscoverHintOnEvent() {
+	using namespace TerrainBalance;
+
+	std::uniform_real_distribution<float> chanceDist(0.0f, 1.0f);
+
+	// 50% 확률로 힌트 획득
+	if (chanceDist(rng) > HINT_CHANCE_ON_EVENT) {
+		return { false, LocationHint() };
+	}
+
+	// 5% 확률로 최종 목적지 힌트
+	if (chanceDist(rng) < SANCTUARY_HINT_CHANCE) {
+		// 최종 목적지 힌트
+		UpgradeSanctuaryHint();
+		LocationHint hint = GenerateSanctuaryHint();
+		pendingHintNotifications.push_back(hint);
+		return { true, hint };
+	}
+
+	// 95% 확률로 일반 지역 힌트
+	std::vector<int> undiscoveredIds;
+	for (const auto& r : regions) {
+		bool alreadyHinted = false;
+		for (const auto& h : discoveredHints) {
+			if (!h.isSanctuary && h.regionId == r.id) {
+				alreadyHinted = true;
+				break;
+			}
+		}
+		if (!alreadyHinted && !r.visited) {
+			undiscoveredIds.push_back(r.id);
+		}
+	}
+
+	if (undiscoveredIds.empty()) {
+		// 지역 힌트가 없으면 최종 목적지 힌트로 대체
+		UpgradeSanctuaryHint();
+		LocationHint hint = GenerateSanctuaryHint();
+		pendingHintNotifications.push_back(hint);
+		return { true, hint };
+	}
+
+	std::uniform_int_distribution<size_t> regionDist(0, undiscoveredIds.size() - 1);
+	int selectedId = undiscoveredIds[regionDist(rng)];
+
+	LocationHint hint = GenerateHint(selectedId, false);
+	discoveredHints.push_back(hint);
+	pendingHintNotifications.push_back(hint);
+
+	return { true, hint };
+}
+
+LocationHint Navigation::GenerateSanctuaryHint() {
+	LocationHint hint;
+	hint.regionId = -1;  // 특수 ID
+	hint.isSanctuary = true;
+
+	switch (sanctuary.hintLevel) {
+	case 1: {
+		// 방향만
+		std::string direction;
+		if (sanctuary.y > currentY + 100) direction += "북";
+		else if (sanctuary.y < currentY - 100) direction += "남";
+		if (sanctuary.x > currentX + 100) direction += "동";
+		else if (sanctuary.x < currentX - 100) direction += "서";
+		if (direction.empty()) direction = "가까운 곳";
+
+		hint.description = "★ 안정지대는 " + direction + "쪽 어딘가에 있다...";
+		hint.approximateX = 0;
+		hint.approximateY = 0;
+		hint.isExact = false;
+		break;
+	}
+	case 2: {
+		// 대략적 좌표 (±100 오차)
+		std::uniform_int_distribution<int> errorDist(-100, 100);
+		hint.approximateX = sanctuary.x + errorDist(rng);
+		hint.approximateY = sanctuary.y + errorDist(rng);
+		hint.isExact = false;
+		hint.description = "★ 안정지대는 대략 (" +
+			std::to_string(hint.approximateX) + ", " + std::to_string(hint.approximateY) + ") 부근";
+		break;
+	}
+	case 3:
+	default: {
+		// 정확한 좌표
+		hint.approximateX = sanctuary.x;
+		hint.approximateY = sanctuary.y;
+		hint.isExact = true;
+		hint.description = "★ 안정지대 정확한 위치: (" +
+			std::to_string(sanctuary.x) + ", " + std::to_string(sanctuary.y) + ")";
+		break;
+	}
+	}
+
+	sanctuary.currentHint = hint.description;
+	return hint;
+}
+
+
+// ============================================================
+// 최종 목적지 (Sanctuary) 시스템
+// ============================================================
+int Navigation::GetDistanceToSanctuary() const {
+	return CalculateDistance(currentX, currentY, sanctuary.x, sanctuary.y);
+}
+
+int Navigation::GetAngleToSanctuary() const {
+	return CalculateAngle(currentX, currentY, sanctuary.x, sanctuary.y);
+}
+
+bool Navigation::CheckSanctuaryArrival(int threshold) {
+	int dist = GetDistanceToSanctuary();
+	if (dist <= threshold) {
+		sanctuary.discovered = true;
+		return true;
+	}
+	return false;
+}
+
+void Navigation::UpgradeSanctuaryHint() {
+	if (sanctuary.hintLevel < 3) {
+		sanctuary.hintLevel++;
+	}
 }
 
 
@@ -587,11 +788,22 @@ void Navigation::SaveState(std::ofstream& out) const {
 		out.write(reinterpret_cast<const char*>(&hint.approximateX), sizeof(hint.approximateX));
 		out.write(reinterpret_cast<const char*>(&hint.approximateY), sizeof(hint.approximateY));
 		out.write(reinterpret_cast<const char*>(&hint.isExact), sizeof(hint.isExact));
+		out.write(reinterpret_cast<const char*>(&hint.isSanctuary), sizeof(hint.isSanctuary));
 
 		uint32_t descLen = static_cast<uint32_t>(hint.description.size());
 		out.write(reinterpret_cast<const char*>(&descLen), sizeof(descLen));
 		out.write(hint.description.data(), descLen);
 	}
+
+	// 최종 목적지 (Sanctuary) 상태
+	out.write(reinterpret_cast<const char*>(&sanctuary.x), sizeof(sanctuary.x));
+	out.write(reinterpret_cast<const char*>(&sanctuary.y), sizeof(sanctuary.y));
+	out.write(reinterpret_cast<const char*>(&sanctuary.hintLevel), sizeof(sanctuary.hintLevel));
+	out.write(reinterpret_cast<const char*>(&sanctuary.discovered), sizeof(sanctuary.discovered));
+
+	uint32_t sanctuaryHintLen = static_cast<uint32_t>(sanctuary.currentHint.size());
+	out.write(reinterpret_cast<const char*>(&sanctuaryHintLen), sizeof(sanctuaryHintLen));
+	out.write(sanctuary.currentHint.data(), sanctuaryHintLen);
 }
 
 void Navigation::LoadState(std::ifstream& in) {
@@ -655,6 +867,7 @@ void Navigation::LoadState(std::ifstream& in) {
 			in.read(reinterpret_cast<char*>(&hint.approximateX), sizeof(hint.approximateX));
 			in.read(reinterpret_cast<char*>(&hint.approximateY), sizeof(hint.approximateY));
 			in.read(reinterpret_cast<char*>(&hint.isExact), sizeof(hint.isExact));
+			in.read(reinterpret_cast<char*>(&hint.isSanctuary), sizeof(hint.isSanctuary));
 
 			uint32_t descLen = 0;
 			in.read(reinterpret_cast<char*>(&descLen), sizeof(descLen));
@@ -663,6 +876,19 @@ void Navigation::LoadState(std::ifstream& in) {
 
 			discoveredHints.push_back(hint);
 		}
+	}
+
+	// 최종 목적지 (Sanctuary) 상태 로드
+	if (in.peek() != EOF) {
+		in.read(reinterpret_cast<char*>(&sanctuary.x), sizeof(sanctuary.x));
+		in.read(reinterpret_cast<char*>(&sanctuary.y), sizeof(sanctuary.y));
+		in.read(reinterpret_cast<char*>(&sanctuary.hintLevel), sizeof(sanctuary.hintLevel));
+		in.read(reinterpret_cast<char*>(&sanctuary.discovered), sizeof(sanctuary.discovered));
+
+		uint32_t sanctuaryHintLen = 0;
+		in.read(reinterpret_cast<char*>(&sanctuaryHintLen), sizeof(sanctuaryHintLen));
+		sanctuary.currentHint.resize(sanctuaryHintLen);
+		in.read(sanctuary.currentHint.data(), sanctuaryHintLen);
 	}
 }
 

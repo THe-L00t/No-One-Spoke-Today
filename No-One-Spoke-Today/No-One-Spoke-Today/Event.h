@@ -300,6 +300,9 @@ using CustomEffectFunc = std::function<void(
 	std::vector<std::unique_ptr<Human>>& allHumans
 )>;
 
+// 이벤트 발생 시 콜백 (힌트 시스템 등 연결용)
+using OnEventTriggeredCallback = std::function<void()>;
+
 
 // ===== 이벤트 매니저 =====
 class EventManager {
@@ -340,6 +343,9 @@ public:
 	// 이벤트 정의 접근
 	const std::vector<EventDef>& GetDefinitions() const { return definitions; }
 	void AddEventDef(const EventDef& def) { definitions.push_back(def); }
+
+	// 이벤트 발생 콜백 설정 (힌트 시스템 연결)
+	void SetOnEventTriggeredCallback(OnEventTriggeredCallback callback) { onEventTriggered = callback; }
 
 private:
 	void RegisterCustomEffects();
@@ -382,4 +388,7 @@ private:
 	std::unordered_map<std::string, CustomEffectFunc> customEffectRegistry;
 
 	std::default_random_engine rng;
+
+	// 이벤트 발생 콜백
+	OnEventTriggeredCallback onEventTriggered;
 };

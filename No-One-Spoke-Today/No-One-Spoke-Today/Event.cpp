@@ -773,6 +773,11 @@ void EventManager::TriggerEvent(
 	// 이벤트 발생 카운터 증가
 	eventsTriggeredToday++;
 
+	// 이벤트 발생 콜백 호출 (힌트 시스템 연결)
+	if (onEventTriggered) {
+		onEventTriggered();
+	}
+
 	if (event.requiresPlayer) {
 		pendingPlayerEvents.push_back(event);
 		EVENT_LOG("[EVENT] Added to pendingPlayerEvents: " << event.name

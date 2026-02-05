@@ -75,6 +75,14 @@ World::World()
 	// 네비게이션 초기화 (지역 데이터 로드 및 랜덤 배치)
 	navigation->Initialize();
 
+	// 이벤트 발생 시 힌트 획득 콜백 등록
+	Navigation* navPtr = navigation.get();
+	eventManager->SetOnEventTriggeredCallback([navPtr]() {
+		if (navPtr) {
+			navPtr->TryDiscoverHintOnEvent();
+		}
+	});
+
 	// 이벤트 파일 로드
 	eventManager->LoadEventDefsFromText("data/events.txt");
 
@@ -113,13 +121,29 @@ void World::Update(float deltaTime)
 				navigation->UpdateMaintenance();
 			}
 			else {
-				// 매일 현재 각도 방향으로 이동
-				navigation->UpdateTravel();
+				// 도시 활력과 평균 피로 계산
+				int cityActivity = city->GetCityMet().activity;
+				int avgFatigue = 0;
+				if (!humans.empty()) {
+					int fatigueSum = 0;
+					for (const auto& h : humans) {
+						fatigueSum += h->GetFatigue();
+					}
+					avgFatigue = fatigueSum / static_cast<int>(humans.size());
+				}
+
+				// 도시 상태 기반 이동 (활력 높고 피로 낮으면 빠름)
+				navigation->UpdateTravel(cityActivity, avgFatigue);
 
 				// 지역 근접 체크
 				int nearbyRegion = navigation->CheckNearbyRegion(30);
 				if (nearbyRegion >= 0) {
 					navigation->OnRegionArrival(nearbyRegion);
+				}
+
+				// 최종 목적지 도착 체크
+				if (navigation->CheckSanctuaryArrival(30)) {
+					// TODO: 엔딩 트리거
 				}
 
 				// 이동 중 힌트 발견 시도
@@ -132,57 +156,78 @@ void World::Update(float deltaTime)
 	float dayRatio = accumulatedTime / dayDuration;
 	eventManager->UpdateTime(dayRatio, *city, humans);
 
-	// 인간/도시 업데이트
-	CityMetrics cm{city->GetCityMet()};
+	// ==================== 다층 영향 시스템 적용 ====================
 
-	// 지형 보정값 가져오기
-	float terrainFatigueMod = 1.0f;
-	float terrainStressMod = 1.0f;
-	float terrainMotivationMod = 1.0f;
-	float terrainSafetyMod = 1.0f;
-	float terrainCognitionMod = 1.0f;
+	// 현재 도시/지형 상태 가져오기
+	CityMetrics cm = city->GetCityMet();
+	TerrainType currentTerrain = TerrainType::Wasteland;
+	float currentTemperature = 20.0f;
 
 	if (navigation) {
-		terrainFatigueMod = navigation->GetFatigueModifier();
-		terrainStressMod = navigation->GetStressModifier();
-		terrainMotivationMod = navigation->GetMotivationModifier();
-		terrainSafetyMod = navigation->GetSafetyModifier();
-		terrainCognitionMod = navigation->GetCognitionModifier();
+		currentTerrain = navigation->GetCurrentTerrain();
+		currentTemperature = navigation->GetCurrentTemperature();
 	}
 
+	// 지형 보정값 구조체 생성
+	TerrainModifiers terrainMod;
+	if (navigation) {
+		terrainMod.fatigue = navigation->GetFatigueModifier();
+		terrainMod.stress = navigation->GetStressModifier();
+		terrainMod.motivation = navigation->GetMotivationModifier();
+		terrainMod.safety = navigation->GetSafetyModifier();
+		terrainMod.cognition = navigation->GetCognitionModifier();
+		terrainMod.temperature = currentTemperature;
+	}
+	else {
+		terrainMod = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 20.0f };
+	}
+
+	// 구역별 리더 방문 기록 (간단히 현재 플레이어 구역만 추적)
+	// TODO: 구역별 마지막 방문일 저장 구현 시 확장
+	static std::unordered_map<int, int> lastLeaderVisitDay;
+
+	// 구역별로 Human 그룹화하여 UpdateContext 생성
+	std::unordered_map<Region, std::vector<Human*>> regionHumans;
 	for (auto& h : humans) {
-		h->UpdateDrive(deltaTime, cm);
+		regionHumans[h->GetRegion()].push_back(h.get());
+	}
 
-		// 지형 효과 적용 (하루 단위로 deltaTime 보정)
-		// 피로: 보정값이 1.0보다 크면 피로 증가
-		if (terrainFatigueMod > 1.0f) {
-			int fatigueDelta = static_cast<int>((terrainFatigueMod - 1.0f) * 5.0f * deltaTime);
-			h->ModifyFatigue(fatigueDelta);
+	// 각 Human 업데이트
+	for (auto& h : humans) {
+		Region humanRegion = h->GetRegion();
+
+		// UpdateContext 생성
+		UpdateContext ctx;
+		ctx.city = cm;
+		ctx.terrain = terrainMod;
+		ctx.humanRegion = humanRegion;
+		ctx.regionMembers = regionHumans[humanRegion];
+		ctx.leaderPresent = (playerRegion == humanRegion);
+		ctx.temperature = currentTemperature;
+
+		// 리더 방문 경과 일수 계산
+		int regionIdx = static_cast<int>(humanRegion);
+		if (ctx.leaderPresent) {
+			lastLeaderVisitDay[regionIdx] = currentDay;
+			ctx.daysSinceLeaderVisit = 0;
 		}
-		// 스트레스: 보정값이 1.0보다 크면 스트레스 증가
-		if (terrainStressMod > 1.0f) {
-			int stressDelta = static_cast<int>((terrainStressMod - 1.0f) * 8.0f * deltaTime);
-			h->ModifyStressLoad(stressDelta);
-		}
-		// 동기: 보정값이 1.0보다 작으면 동기 감소
-		if (terrainMotivationMod < 1.0f) {
-			int motivationDelta = static_cast<int>((1.0f - terrainMotivationMod) * -6.0f * deltaTime);
-			h->ModifyMotivation(motivationDelta);
-		}
-		// 사회적 안전감: 보정값이 1.0보다 작으면 감소
-		if (terrainSafetyMod < 1.0f) {
-			int safetyDelta = static_cast<int>((1.0f - terrainSafetyMod) * -4.0f * deltaTime);
-			h->ModifySocialSafety(safetyDelta);
-		}
-		// 인지 능력: 보정값이 1.0보다 작으면 감소
-		if (terrainCognitionMod < 1.0f) {
-			int cognitionDelta = static_cast<int>((1.0f - terrainCognitionMod) * -3.0f * deltaTime);
-			h->ModifyCognitiveCapacity(cognitionDelta);
+		else {
+			auto it = lastLeaderVisitDay.find(regionIdx);
+			if (it != lastLeaderVisitDay.end()) {
+				ctx.daysSinceLeaderVisit = currentDay - it->second;
+			}
+			else {
+				ctx.daysSinceLeaderVisit = currentDay;  // 한 번도 방문 안 함
+			}
 		}
 
+		// 다층 영향 시스템을 통한 드라이브 업데이트
+		h->UpdateDrive(deltaTime, ctx);
 		h->UpdateMentalState();
 	}
-	city->Update(humans);
+
+	// 도시 지표 업데이트 (비선형 효과 적용)
+	city->Update(humans, currentTemperature, currentTerrain);
 }
 
 EventManager* World::GetEventManager()

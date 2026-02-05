@@ -154,3 +154,192 @@ struct CityMetrics {		// 0~10000
 	int activity;
 	int scarcity;
 };
+
+
+// =============================================================================================
+// 다층 영향 시스템 (Multi-Layer Influence System)
+// =============================================================================================
+
+// 구역별 환경 특성
+struct RegionEnvironment {
+	float fatigueRate;      // 피로 증가율 배수
+	float stressRate;       // 스트레스 증가율 배수
+	float motivationRate;   // 동기 변화율 (음수 = 감소)
+	float safetyRate;       // 안전감 변화율
+	float trustRate;        // 신뢰 변화율
+	float contagionFactor;  // 사회적 전염 강도
+	float recoveryRate;     // 회복 속도 배율
+};
+
+// 구역별 환경 상수
+inline const RegionEnvironment& GetRegionEnvironment(Region region) {
+	static const RegionEnvironment environments[] = {
+		// Cockpit (조타실) - 고립, 책임감
+		{ 0.8f,  1.2f,  0.0f,  1.0f,  0.0f, 0.0f, 1.0f },
+		// OuterWallMaintenance (외벽정비) - 위험, 고강도
+		{ 1.4f,  1.5f, -0.2f,  0.7f,  0.0f, 0.8f, 0.7f },
+		// Canteen (식당) - 사교, 휴식
+		{ 0.6f,  0.7f,  0.1f,  1.1f,  0.15f, 1.3f, 1.3f },
+		// RecyclingPlant (순환정제소) - 단조로움, 오염
+		{ 1.2f,  1.1f, -0.15f, 0.9f,  0.0f, 0.6f, 0.9f },
+		// VerticalFarm (수직농장) - 자연, 생산적
+		{ 1.0f,  0.8f,  0.1f,  1.05f, 0.05f, 0.7f, 1.1f },
+		// LowerDrive (하부구동부) - 극한 노동, 소음
+		{ 1.6f,  1.4f, -0.25f, 0.8f, -0.1f, 1.0f, 0.6f },
+		// CentralPowerway (중앙동력로) - 위험, 필수
+		{ 1.3f,  1.3f, -0.1f,  0.85f, 0.0f, 0.5f, 0.8f },
+		// ResidentialArea1 (거주구역1) - 일상, 사교
+		{ 0.8f,  0.9f,  0.0f,  1.0f,  0.1f, 1.2f, 1.2f },
+		// ResidentialArea2 (거주구역2) - 일상, 사교
+		{ 0.8f,  0.9f,  0.0f,  1.0f,  0.1f, 1.2f, 1.2f },
+	};
+	int idx = static_cast<int>(region);
+	if (idx < 0 || idx >= static_cast<int>(Region::COUNT)) {
+		idx = 0;
+	}
+	return environments[idx];
+}
+
+// 개인 성향 민감도 계수
+struct TraitSensitivity {
+	float stressSens;       // 스트레스 민감도
+	float fatigueSens;      // 피로 민감도
+	float motivationSens;   // 동기 민감도
+	float safetySens;       // 사회적 안전감 민감도
+	float trustSens;        // 신뢰 민감도
+	float controlSens;      // 통제감 민감도
+	float arousalSens;      // 감정 각성 민감도
+	float cognitionSens;    // 인지 능력 민감도
+
+	// 성향으로부터 민감도 계산
+	static TraitSensitivity Calculate(const Trait& t) {
+		TraitSensitivity s;
+
+		// 스트레스 민감도: 감정민감↑, 이성↓
+		s.stressSens = 1.0f
+			+ (t.emotionalSensitivity - 50) * 0.008f
+			- (t.rationality - 50) * 0.005f;
+
+		// 피로 민감도: 감정민감↑, 계획성↓(페이싱)
+		s.fatigueSens = 1.0f
+			+ (t.emotionalSensitivity - 50) * 0.004f
+			- (t.planning - 50) * 0.003f;
+
+		// 동기 민감도: 감정민감(양날의 검), 경직↓
+		s.motivationSens = 1.0f
+			+ (t.emotionalSensitivity - 50) * 0.006f
+			- (t.rigidity - 50) * 0.004f;
+
+		// 안전감 민감도: 의존↑, 감정민감↑
+		s.safetySens = 1.0f
+			+ (t.dependency - 50) * 0.008f
+			+ (t.emotionalSensitivity - 50) * 0.004f;
+
+		// 신뢰 민감도: 공격성↓, 의존↑
+		s.trustSens = 1.0f
+			- (t.aggressiveness - 50) * 0.005f
+			+ (t.dependency - 50) * 0.004f;
+
+		// 통제감 민감도: 경직↑, 의존↓
+		s.controlSens = 1.0f
+			+ (t.rigidity - 50) * 0.006f
+			- (t.dependency - 50) * 0.005f;
+
+		// 감정 각성 민감도: 감정민감↑, 공격성↑
+		s.arousalSens = 1.0f
+			+ (t.emotionalSensitivity - 50) * 0.007f
+			+ (t.aggressiveness - 50) * 0.004f;
+
+		// 인지 민감도: 이성↓(안정), 감정민감↑
+		s.cognitionSens = 1.0f
+			- (t.rationality - 50) * 0.004f
+			+ (t.emotionalSensitivity - 50) * 0.003f;
+
+		return s;
+	}
+};
+
+// 지형 보정값
+struct TerrainModifiers {
+	float fatigue;
+	float stress;
+	float motivation;
+	float safety;
+	float cognition;
+	float temperature;
+};
+
+// 업데이트 컨텍스트 (Human::UpdateDrive에 전달)
+class Human;  // 전방 선언
+
+struct UpdateContext {
+	CityMetrics city;
+	TerrainModifiers terrain;
+	Region humanRegion;
+	std::vector<Human*> regionMembers;  // 같은 구역 사람들
+	bool leaderPresent;                 // 리더(플레이어)가 현재 구역에 있는지
+	int daysSinceLeaderVisit;           // 리더가 이 구역 방문 후 경과 일수
+	float temperature;                  // 현재 기온
+
+	UpdateContext()
+		: city{ 5000, 5000, 5000 }
+		, terrain{ 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 20.0f }
+		, humanRegion(Region::ResidentialArea1)
+		, leaderPresent(false)
+		, daysSinceLeaderVisit(0)
+		, temperature(20.0f)
+	{}
+};
+
+// =============================================================================================
+// 수식 관련 상수
+// =============================================================================================
+namespace FormulaConstants {
+	// 기본 변화량 (초당)
+	constexpr float BASE_STRESS_CHANGE = 0.15f;
+	constexpr float BASE_FATIGUE_CHANGE = 0.08f;
+	constexpr float BASE_MOTIVATION_CHANGE = 0.10f;
+	constexpr float BASE_SAFETY_CHANGE = 0.06f;
+	constexpr float BASE_TRUST_CHANGE = 0.04f;
+	constexpr float BASE_CONTROL_CHANGE = 0.05f;
+	constexpr float BASE_AROUSAL_CHANGE = 0.12f;
+	constexpr float BASE_COGNITION_CHANGE = 0.05f;
+
+	// 사회적 전염 계수
+	constexpr float CONTAGION_HOSTILE = 0.15f;      // 적대적 사람 한 명당 전염
+	constexpr float CONTAGION_IRRITABLE = 0.08f;    // 과민 사람 전염
+	constexpr float CONTAGION_HIGH_STRESS = 0.05f;  // 고스트레스 전염
+	constexpr float CONTAGION_COOPERATIVE = -0.06f; // 협력적 사람은 음의 전염
+
+	// 사회적 지지/완충 계수
+	constexpr float BUFFER_COOPERATIVE_MAX = 0.3f;  // 협력적 동료 최대 완충
+	constexpr float BUFFER_LEADER_PRESENT = 0.2f;   // 리더 현재 방문 완충
+	constexpr float BUFFER_LEADER_ABSENT_RATE = 0.05f; // 리더 부재 하루당 증가
+
+	// 상호작용 효과 계수
+	constexpr float INTERACTION_STRESS_FATIGUE = 0.8f;
+	constexpr float INTERACTION_AROUSAL_STRESS = 0.5f;
+	constexpr float INTERACTION_FATIGUE_MOTIVATION = 2.0f;
+
+	// 임계점
+	constexpr float THRESHOLD_HIGH = 80.0f;    // 고위험 구간
+	constexpr float THRESHOLD_LOW = 20.0f;     // 안전 구간
+	constexpr float THRESHOLD_MID_LOW = 40.0f; // 안정 구간 하한
+	constexpr float THRESHOLD_MID_HIGH = 60.0f;// 안정 구간 상한
+
+	// 회복 비대칭
+	constexpr float RECOVERY_RATE = 0.6f;      // 회복은 악화의 60% 속도
+
+	// 기온 관련
+	constexpr float OPTIMAL_TEMP = 20.0f;
+	constexpr float COMFORT_RANGE = 10.0f;
+
+	// Yerkes-Dodson 최적 각성 구간
+	constexpr float YD_OPTIMAL_LOW = 40.0f;
+	constexpr float YD_OPTIMAL_HIGH = 60.0f;
+	constexpr float YD_BONUS = 1.1f;
+
+	// 결핍-신뢰 붕괴 임계점
+	constexpr float SCARCITY_TRUST_THRESHOLD1 = 60.0f;
+	constexpr float SCARCITY_TRUST_THRESHOLD2 = 75.0f;
+}

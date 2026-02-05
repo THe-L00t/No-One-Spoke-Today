@@ -102,48 +102,460 @@ void Human::UpdateMentalState()
         state.control = ControlState::Autonomous;
 }
 
-void Human::UpdateDrive(float deltaTime, CityMetrics city)
+void Human::UpdateDrive(float deltaTime, const UpdateContext& ctx)
 {
-    // ΔTime을 초 단위로 받음
-    // 최대 변화량 상수
-    const int MAX_STRESS_DELTA = 15;     // 1초 기준 최대 변화량 (기존 50의 30%)
-    const int MAX_MOTIVATION_DELTA = 30;
-    const int MAX_SOCIAL_DELTA = 20;
-    const int MAX_FATIGUE_DELTA = 8;     // 하루 평균 20% 상승 목표
+    using namespace FormulaConstants;
 
-    // --- StressLoad ---
-    int stressDelta = MAX_STRESS_DELTA * (10000 - city.mood) / 10000;
-    // 상태 보정
-    switch (state.arousal) {
-    case ArousalState::Calm: stressDelta *= 0.5; break;
-    case ArousalState::Tense: stressDelta *= 1.0; break;
-    case ArousalState::Irritable: stressDelta *= 1.3; break;
-    case ArousalState::Hostile: stressDelta *= 1.5; break;
+    // 성향 민감도 계산
+    TraitSensitivity sens = GetTraitSensitivity();
+
+    // 구역 환경 가져오기
+    const RegionEnvironment& regionEnv = GetRegionEnvironment(ctx.humanRegion);
+
+    // 사회적 효과 계산
+    float contagion = CalculateSocialContagion(ctx.regionMembers);
+    float buffer = CalculateSocialBuffer(ctx.regionMembers, ctx.leaderPresent, ctx.daysSinceLeaderVisit);
+    float interaction = CalculateInteractionEffect();
+    float tempEffect = CalculateTemperatureEffect(ctx.temperature);
+    float ydEffect = CalculateYerkesDodson();
+    float scarcityTrustFactor = CalculateScarcityTrustCollapse(static_cast<float>(ctx.city.scarcity) / 100.0f);
+
+    // 도시 상태 정규화 (0~1)
+    float cityMoodNorm = ctx.city.mood / 10000.0f;
+    float cityActivityNorm = ctx.city.activity / 10000.0f;
+    float cityScarcityNorm = ctx.city.scarcity / 10000.0f;
+
+    // ==================== STRESS ====================
+    {
+        // 기본 변화: 도시 분위기 나쁠수록 증가
+        float baseChange = BASE_STRESS_CHANGE * (1.0f - cityMoodNorm) * 100.0f;
+
+        // 지형 + 구역 + 기온 보정
+        float envMod = ctx.terrain.stress * regionEnv.stressRate * tempEffect;
+
+        // 개인 민감도
+        float personalDelta = baseChange * envMod * sens.stressSens;
+
+        // 사회적 전염 추가
+        float socialDelta = contagion * regionEnv.contagionFactor * 10.0f;
+
+        // 상태 보정
+        float stateMod = 1.0f;
+        switch (state.arousal) {
+        case ArousalState::Calm: stateMod = 0.5f; break;
+        case ArousalState::Tense: stateMod = 1.0f; break;
+        case ArousalState::Irritable: stateMod = 1.3f; break;
+        case ArousalState::Hostile: stateMod = 1.5f; break;
+        }
+
+        // 통합
+        float totalDelta = (personalDelta + socialDelta) * buffer * interaction * stateMod;
+
+        // 임계점 효과
+        totalDelta = CalculateThresholdEffect(static_cast<float>(drives.stressLoad) / 100.0f, totalDelta);
+
+        // 회복 비대칭
+        totalDelta = ApplyRecoveryAsymmetry(totalDelta, static_cast<float>(drives.stressLoad) / 100.0f);
+
+        drives.stressLoad = std::clamp(drives.stressLoad + static_cast<int>(totalDelta * deltaTime), 0, 10000);
     }
-    drives.stressLoad = std::clamp(drives.stressLoad + stressDelta * deltaTime, 0.f, 10000.f);
 
-    // --- Motivation & Cognitive Capacity ---
-    int motivationDelta = MAX_MOTIVATION_DELTA * city.activity / 10000;
-    if (state.energy == EnergyState::Fatigued) motivationDelta *= 0.7;
-    if (state.energy == EnergyState::Exhausted) motivationDelta *= 0.4;
-    drives.motivation = std::clamp(drives.motivation + motivationDelta * deltaTime, 0.f, 10000.f);
+    // ==================== FATIGUE ====================
+    {
+        // 기본 변화: 활동성 낮을수록 피로 증가 (쉬지 못함)
+        float baseChange = BASE_FATIGUE_CHANGE * (1.0f - cityActivityNorm * 0.5f) * 100.0f;
 
-    int cognitiveDelta = MAX_MOTIVATION_DELTA * city.activity / 10000;
-    drives.cognitiveCapacity = std::clamp(drives.cognitiveCapacity + cognitiveDelta * deltaTime, 0.f, 10000.f);
+        // 지형 + 구역 보정
+        float envMod = ctx.terrain.fatigue * regionEnv.fatigueRate * tempEffect;
 
-    // --- SocialSafety & SenseOfControl ---
-    int socialDelta = MAX_SOCIAL_DELTA * (10000 - city.scarcity) / 10000;
-    if (state.control == ControlState::Dependent) socialDelta *= 0.7;
-    if (state.control == ControlState::Stubborn) socialDelta *= 0.9;
-    drives.socialSafety = std::clamp(drives.socialSafety + socialDelta * deltaTime, 0.f, 10000.f);
-    drives.senseOfControl = std::clamp(drives.senseOfControl + socialDelta * deltaTime, 0.f, 10000.f);
+        // 개인 민감도
+        float personalDelta = baseChange * envMod * sens.fatigueSens;
 
-    // --- Fatigue & EmotionalArousal ---
-    int fatigueDelta = MAX_FATIGUE_DELTA * (10000 - city.activity) / 10000;
-    drives.fatigue = std::clamp(drives.fatigue + fatigueDelta * deltaTime, 0.f, 10000.f);
+        // 에너지 상태 보정
+        float stateMod = 1.0f;
+        switch (state.energy) {
+        case EnergyState::Normal: stateMod = 0.8f; break;
+        case EnergyState::Fatigued: stateMod = 1.2f; break;
+        case EnergyState::Exhausted: stateMod = 1.5f; break;
+        }
 
-    int arousalDelta = MAX_SOCIAL_DELTA * (10000 - city.mood) / 10000;
-    drives.emotionalArousal = std::clamp(drives.emotionalArousal + arousalDelta * deltaTime, 0.f, 10000.f);
+        float totalDelta = personalDelta * interaction * stateMod;
+
+        // 구역 회복률 적용 (음수면 회복)
+        if (totalDelta < 0) {
+            totalDelta *= regionEnv.recoveryRate;
+        }
+
+        totalDelta = CalculateThresholdEffect(static_cast<float>(drives.fatigue) / 100.0f, totalDelta);
+        totalDelta = ApplyRecoveryAsymmetry(totalDelta, static_cast<float>(drives.fatigue) / 100.0f);
+
+        drives.fatigue = std::clamp(drives.fatigue + static_cast<int>(totalDelta * deltaTime), 0, 10000);
+    }
+
+    // ==================== EMOTIONAL AROUSAL ====================
+    {
+        // 기본 변화: 분위기 나쁠수록 각성 증가
+        float baseChange = BASE_AROUSAL_CHANGE * (1.0f - cityMoodNorm) * 100.0f;
+
+        // 지형 + 기온
+        float envMod = ctx.terrain.stress * tempEffect;  // 스트레스 지형이 각성에도 영향
+
+        // 개인 민감도
+        float personalDelta = baseChange * envMod * sens.arousalSens;
+
+        // 사회적 전염 (감정 각성은 전염이 강함)
+        float socialDelta = contagion * regionEnv.contagionFactor * 15.0f;
+
+        float totalDelta = (personalDelta + socialDelta) * buffer;
+
+        totalDelta = CalculateThresholdEffect(static_cast<float>(drives.emotionalArousal) / 100.0f, totalDelta);
+        totalDelta = ApplyRecoveryAsymmetry(totalDelta, static_cast<float>(drives.emotionalArousal) / 100.0f);
+
+        drives.emotionalArousal = std::clamp(drives.emotionalArousal + static_cast<int>(totalDelta * deltaTime), 0, 10000);
+    }
+
+    // ==================== MOTIVATION ====================
+    {
+        // 기본 변화: 활동성 높을수록 동기 증가
+        float baseChange = BASE_MOTIVATION_CHANGE * (cityActivityNorm - 0.5f) * 100.0f;
+
+        // 지형 + 구역 보정
+        float envMod = ctx.terrain.motivation;
+        if (regionEnv.motivationRate < 0) {
+            baseChange += regionEnv.motivationRate * 50.0f;  // 구역 동기 감소 효과
+        }
+        else {
+            baseChange += regionEnv.motivationRate * 30.0f;  // 구역 동기 증가 효과
+        }
+
+        // 개인 민감도 + Yerkes-Dodson
+        float personalDelta = baseChange * envMod * sens.motivationSens * ydEffect;
+
+        // 에너지 상태 보정
+        if (state.energy == EnergyState::Fatigued) personalDelta *= 0.7f;
+        if (state.energy == EnergyState::Exhausted) personalDelta *= 0.4f;
+
+        float totalDelta = personalDelta * buffer;
+
+        totalDelta = CalculateThresholdEffect(static_cast<float>(drives.motivation) / 100.0f, totalDelta);
+        totalDelta = ApplyRecoveryAsymmetry(totalDelta, static_cast<float>(drives.motivation) / 100.0f);
+
+        drives.motivation = std::clamp(drives.motivation + static_cast<int>(totalDelta * deltaTime), 0, 10000);
+    }
+
+    // ==================== COGNITIVE CAPACITY ====================
+    {
+        // 기본 변화: 활동성 높을수록 인지 유지
+        float baseChange = BASE_COGNITION_CHANGE * (cityActivityNorm - 0.3f) * 100.0f;
+
+        // 지형 + 기온
+        float envMod = ctx.terrain.cognition * tempEffect;
+
+        // 개인 민감도 + Yerkes-Dodson
+        float personalDelta = baseChange * envMod * sens.cognitionSens * ydEffect;
+
+        // 피로/스트레스 상호작용
+        personalDelta *= (1.0f / interaction);  // 상호작용 높으면 인지 저하
+
+        float totalDelta = personalDelta;
+
+        totalDelta = CalculateThresholdEffect(static_cast<float>(drives.cognitiveCapacity) / 100.0f, totalDelta);
+        totalDelta = ApplyRecoveryAsymmetry(totalDelta, static_cast<float>(drives.cognitiveCapacity) / 100.0f);
+
+        drives.cognitiveCapacity = std::clamp(drives.cognitiveCapacity + static_cast<int>(totalDelta * deltaTime), 0, 10000);
+    }
+
+    // ==================== INTERPERSONAL TRUST ====================
+    {
+        // 기본 변화: 분위기 좋을수록 신뢰 증가
+        float baseChange = BASE_TRUST_CHANGE * (cityMoodNorm - 0.5f) * 100.0f;
+
+        // 구역 보정
+        baseChange += regionEnv.trustRate * 30.0f;
+
+        // 결핍-신뢰 붕괴
+        if (cityScarcityNorm > 0.6f) {
+            baseChange -= scarcityTrustFactor * 20.0f;
+        }
+
+        // 개인 민감도
+        float personalDelta = baseChange * sens.trustSens;
+
+        // 협력적 동료 비율에 따른 보너스
+        int cooperativeCount = 0;
+        for (Human* other : ctx.regionMembers) {
+            if (other != this && other->GetSocial() == SocialState::Cooperative) {
+                cooperativeCount++;
+            }
+        }
+        float coopRatio = ctx.regionMembers.empty() ? 0.0f :
+            static_cast<float>(cooperativeCount) / ctx.regionMembers.size();
+        personalDelta += coopRatio * 5.0f;
+
+        float totalDelta = personalDelta * buffer;
+
+        totalDelta = CalculateThresholdEffect(static_cast<float>(drives.interpersonalTrust) / 100.0f, totalDelta);
+        totalDelta = ApplyRecoveryAsymmetry(totalDelta, static_cast<float>(drives.interpersonalTrust) / 100.0f);
+
+        drives.interpersonalTrust = std::clamp(drives.interpersonalTrust + static_cast<int>(totalDelta * deltaTime), 0, 10000);
+    }
+
+    // ==================== SOCIAL SAFETY ====================
+    {
+        // 기본 변화: 결핍 낮을수록 안전감 증가
+        float baseChange = BASE_SAFETY_CHANGE * (1.0f - cityScarcityNorm) * 100.0f;
+
+        // 지형 + 구역 보정
+        float envMod = ctx.terrain.safety * regionEnv.safetyRate;
+
+        // 개인 민감도
+        float personalDelta = baseChange * envMod * sens.safetySens;
+
+        // 상태 보정
+        if (state.control == ControlState::Dependent) personalDelta *= 0.7f;
+
+        float totalDelta = personalDelta * buffer;
+
+        totalDelta = CalculateThresholdEffect(static_cast<float>(drives.socialSafety) / 100.0f, totalDelta);
+        totalDelta = ApplyRecoveryAsymmetry(totalDelta, static_cast<float>(drives.socialSafety) / 100.0f);
+
+        drives.socialSafety = std::clamp(drives.socialSafety + static_cast<int>(totalDelta * deltaTime), 0, 10000);
+    }
+
+    // ==================== SENSE OF CONTROL ====================
+    {
+        // 기본 변화: 결핍 낮을수록 통제감 증가
+        float baseChange = BASE_CONTROL_CHANGE * (1.0f - cityScarcityNorm) * 100.0f;
+
+        // 리더 방문 효과
+        if (ctx.leaderPresent) {
+            baseChange += 10.0f;  // 리더 있으면 통제감 증가
+        }
+
+        // 개인 민감도
+        float personalDelta = baseChange * sens.controlSens;
+
+        // 상태 보정
+        if (state.control == ControlState::Stubborn) personalDelta *= 0.7f;  // 고집은 변화에 둔감
+
+        float totalDelta = personalDelta * buffer;
+
+        totalDelta = CalculateThresholdEffect(static_cast<float>(drives.senseOfControl) / 100.0f, totalDelta);
+        totalDelta = ApplyRecoveryAsymmetry(totalDelta, static_cast<float>(drives.senseOfControl) / 100.0f);
+
+        drives.senseOfControl = std::clamp(drives.senseOfControl + static_cast<int>(totalDelta * deltaTime), 0, 10000);
+    }
+}
+
+// ==================== 다층 영향 시스템 함수 구현 ====================
+
+float Human::CalculateSocialContagion(const std::vector<Human*>& regionMembers) const
+{
+    using namespace FormulaConstants;
+
+    if (regionMembers.empty()) return 0.0f;
+
+    float contagionSum = 0.0f;
+    int count = 0;
+
+    for (Human* other : regionMembers) {
+        if (other == this) continue;
+
+        // 감정 각성 상태 전염
+        switch (other->GetArousal()) {
+        case ArousalState::Hostile:
+            contagionSum += CONTAGION_HOSTILE;
+            break;
+        case ArousalState::Irritable:
+            contagionSum += CONTAGION_IRRITABLE;
+            break;
+        default:
+            break;
+        }
+
+        // 고스트레스 전염
+        if (other->GetStressLoad() > 7000) {
+            contagionSum += CONTAGION_HIGH_STRESS;
+        }
+
+        // 협력적 사람은 음의 전염 (안정화)
+        if (other->GetSocial() == SocialState::Cooperative) {
+            contagionSum += CONTAGION_COOPERATIVE;
+        }
+
+        count++;
+    }
+
+    // 집단 크기 보정 (작은 집단일수록 전염 강함)
+    float groupSizeFactor = 10.0f / (count + 10.0f);
+
+    // 본인의 전염 저항력 (이성 높으면 저항)
+    float resistance = 1.0f - (traits.rationality * 0.005f);
+
+    return (std::max)(0.0f, contagionSum * groupSizeFactor * resistance);
+}
+
+float Human::CalculateSocialBuffer(const std::vector<Human*>& regionMembers,
+    bool leaderPresent, int daysSinceLeaderVisit) const
+{
+    using namespace FormulaConstants;
+
+    float buffer = 1.0f;
+
+    // 협력적 동료 비율
+    if (!regionMembers.empty()) {
+        int cooperativeCount = 0;
+        for (Human* other : regionMembers) {
+            if (other != this && other->GetSocial() == SocialState::Cooperative) {
+                cooperativeCount++;
+            }
+        }
+        float cooperativeRatio = static_cast<float>(cooperativeCount) / regionMembers.size();
+        buffer -= cooperativeRatio * BUFFER_COOPERATIVE_MAX;
+    }
+
+    // 리더 현재 방문 중
+    if (leaderPresent) {
+        buffer -= BUFFER_LEADER_PRESENT;
+        // 의존성 높은 사람은 리더 효과 더 큼
+        buffer -= (traits.dependency - 50) * 0.003f;
+    }
+
+    // 리더 오래 부재 시 불안 증가
+    if (daysSinceLeaderVisit > 3) {
+        buffer += (daysSinceLeaderVisit - 3) * BUFFER_LEADER_ABSENT_RATE;
+    }
+
+    return std::clamp(buffer, 0.3f, 1.5f);
+}
+
+float Human::CalculateInteractionEffect() const
+{
+    using namespace FormulaConstants;
+
+    float stress = drives.stressLoad / 10000.0f;
+    float fatigue = drives.fatigue / 10000.0f;
+    float arousal = drives.emotionalArousal / 10000.0f;
+    float motivation = drives.motivation / 10000.0f;
+
+    // 스트레스 × 피로 상호작용
+    float stressFatigueInt = 1.0f + (stress * fatigue * INTERACTION_STRESS_FATIGUE);
+
+    // 고각성 + 고스트레스 = 폭발 위험
+    float arousalStressInt = 1.0f + (arousal * stress * INTERACTION_AROUSAL_STRESS);
+
+    // 피로 + 저동기 = 무기력 악순환
+    float fatigueMotivationInt = 1.0f;
+    if (fatigue > 0.6f && motivation < 0.4f) {
+        fatigueMotivationInt = 1.0f + ((fatigue - 0.6f) * (0.4f - motivation) * INTERACTION_FATIGUE_MOTIVATION);
+    }
+
+    return stressFatigueInt * arousalStressInt * fatigueMotivationInt;
+}
+
+float Human::CalculateThresholdEffect(float currentValue, float delta) const
+{
+    using namespace FormulaConstants;
+
+    // currentValue는 0~100 스케일로 정규화됨
+
+    // 80% 이상: 악화 가속
+    if (currentValue > THRESHOLD_HIGH && delta > 0) {
+        return delta * (1.0f + (currentValue - THRESHOLD_HIGH) * 0.05f);
+    }
+
+    // 20% 이하: 회복 둔화 (이미 좋으면 더 좋아지기 어려움)
+    if (currentValue < THRESHOLD_LOW && delta < 0) {
+        return delta * 0.5f;
+    }
+
+    // 40~60% 구간: 안정 (변화 저항)
+    if (currentValue > THRESHOLD_MID_LOW && currentValue < THRESHOLD_MID_HIGH) {
+        return delta * 0.8f;
+    }
+
+    return delta;
+}
+
+float Human::ApplyRecoveryAsymmetry(float delta, float currentValue) const
+{
+    using namespace FormulaConstants;
+
+    if (delta > 0) {
+        // 악화: 기본 속도
+        return delta;
+    }
+    else {
+        // 회복: 현재 상태가 나쁠수록 회복도 느림 (악순환)
+        float recoveryPenalty = 1.0f - (currentValue / 100.0f) * 0.5f;
+        return delta * RECOVERY_RATE * (std::max)(0.3f, recoveryPenalty);
+    }
+}
+
+float Human::CalculateYerkesDodson() const
+{
+    using namespace FormulaConstants;
+
+    float arousal = drives.emotionalArousal / 100.0f;  // 0~100
+
+    // 최적 구간 (40~60)
+    if (arousal >= YD_OPTIMAL_LOW && arousal <= YD_OPTIMAL_HIGH) {
+        return YD_BONUS;  // 10% 보너스
+    }
+
+    // 최적에서 멀어질수록 페널티
+    float distance = 0.0f;
+    if (arousal < YD_OPTIMAL_LOW) {
+        distance = YD_OPTIMAL_LOW - arousal;
+    }
+    else {
+        distance = arousal - YD_OPTIMAL_HIGH;
+    }
+
+    if (distance < 15.0f) {
+        return 1.0f;  // 정상 범위
+    }
+
+    return (std::max)(0.6f, 1.0f - (distance - 15.0f) * 0.02f);
+}
+
+float Human::CalculateScarcityTrustCollapse(float scarcity) const
+{
+    using namespace FormulaConstants;
+
+    // scarcity는 0~100 스케일
+    if (scarcity < SCARCITY_TRUST_THRESHOLD1) return 1.0f;
+
+    if (scarcity < SCARCITY_TRUST_THRESHOLD2) {
+        return 1.0f + (scarcity - SCARCITY_TRUST_THRESHOLD1) * 0.02f;  // 완만한 증가
+    }
+
+    // 75% 이상: 급격한 신뢰 붕괴
+    float excess = scarcity - SCARCITY_TRUST_THRESHOLD2;
+    return 1.0f + (excess * excess) * 0.01f;
+}
+
+float Human::CalculateTemperatureEffect(float temperature) const
+{
+    using namespace FormulaConstants;
+
+    float diff = std::abs(temperature - OPTIMAL_TEMP);
+
+    // 쾌적 범위 내: 영향 없음
+    if (diff <= COMFORT_RANGE) {
+        return 1.0f;
+    }
+
+    // 쾌적 범위 초과: 제곱 함수로 급격히 증가
+    float excess = diff - COMFORT_RANGE;
+    float modifier = 1.0f + (excess * excess) * 0.003f;
+
+    return (std::min)(modifier, 2.0f);  // 최대 2배
+}
+
+TraitSensitivity Human::GetTraitSensitivity() const
+{
+    return TraitSensitivity::Calculate(traits);
 }
 
 int Human::GetRationality() const

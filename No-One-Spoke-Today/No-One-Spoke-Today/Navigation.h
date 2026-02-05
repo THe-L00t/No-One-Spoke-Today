@@ -84,12 +84,18 @@ namespace TerrainBalance {
 	constexpr float OASIS_EVENT_MOD = 0.5f;         // 안전
 	constexpr float WASTELAND_EVENT_MOD = 1.0f;     // 기본
 
-	// === 거리당 이동 일수 ===
-	constexpr float DISTANCE_PER_DAY = 50.0f;       // 하루에 50 단위 이동
+	// === 이동 속도 밸런싱 ===
+	constexpr float BASE_SPEED = 40.0f;             // 기본 속도 (좌표/일)
+	constexpr float MAX_SPEED = 60.0f;              // 최대 속도 (최적 상태)
+	constexpr float MIN_SPEED = 15.0f;              // 최소 속도 (최악 상태)
+	constexpr float ACTIVITY_SPEED_FACTOR = 20.0f;  // 활력 보정 최대치 (±20)
+	constexpr float FATIGUE_SPEED_FACTOR = 15.0f;   // 피로 감속 최대치 (-15)
 
 	// === 힌트 발견 확률 ===
-	constexpr float HINT_CHANCE_TRAVEL = 0.15f;     // 이동 중 힌트 발견 확률 (일당)
-	constexpr float HINT_CHANCE_DIALOGUE = 0.05f;   // 대화 시 힌트 확률
+	constexpr float HINT_CHANCE_ON_EVENT = 0.50f;   // 이벤트 발생 시 힌트 확률 (50%)
+	constexpr float SANCTUARY_HINT_CHANCE = 0.05f;  // 힌트 중 최종목적지 확률 (5%)
+	constexpr float HINT_CHANCE_TRAVEL = 0.15f;     // 이동 중 힌트 발견 확률 (일당) - 기존 유지
+	constexpr float HINT_CHANCE_DIALOGUE = 0.05f;   // 대화 시 힌트 확률 - 기존 유지
 }
 
 
@@ -170,14 +176,31 @@ struct Route {
 // 위치 힌트 정보
 // ============================================================
 struct LocationHint {
-	int regionId;                // 힌트 대상 지역
+	int regionId;                // 힌트 대상 지역 (-1이면 Sanctuary)
 	std::string description;     // 힌트 설명
 	int approximateX;            // 대략적 X (±50 오차)
 	int approximateY;            // 대략적 Y (±50 오차)
 	bool isExact;                // 정확한 위치인지
+	bool isSanctuary;            // 최종 목적지 힌트인지
 
 	LocationHint()
-		: regionId(-1), approximateX(0), approximateY(0), isExact(false)
+		: regionId(-1), approximateX(0), approximateY(0), isExact(false), isSanctuary(false)
+	{}
+};
+
+
+// ============================================================
+// 최종 목적지 (안정지대) 정보
+// ============================================================
+struct Sanctuary {
+	int x;                       // 정확한 X 좌표
+	int y;                       // 정확한 Y 좌표
+	int hintLevel;               // 힌트 레벨: 0=미발견, 1=방향, 2=대략좌표, 3=정확좌표
+	std::string currentHint;     // 현재 힌트 설명
+	bool discovered;             // 발견 여부 (도착 시 true)
+
+	Sanctuary()
+		: x(0), y(0), hintLevel(0), discovered(false)
 	{}
 };
 
@@ -218,8 +241,10 @@ public:
 	int GetMovementAngle() const { return currentAngle; }
 
 	// 이동 처리 (매일 현재 각도 방향으로 이동)
-	void UpdateTravel();
+	void UpdateTravel(int cityActivity, int avgFatigue);  // 도시 상태 기반 속도
+	void UpdateTravel();  // 기본 속도 (하위 호환)
 	int GetTraveledDays() const { return traveledDays; }
+	int CalculateDailySpeed(int cityActivity, int avgFatigue) const;  // 이동 속도 계산
 
 	// 지역 도착 체크
 	int CheckNearbyRegion(int proximityThreshold = 30) const;  // 근처 지역 ID 반환 (-1: 없음)
@@ -242,10 +267,26 @@ public:
 
 	// 힌트 시스템 (좌표 기반)
 	LocationHint GenerateHint(int regionId, bool exact = false);
+	LocationHint GenerateSanctuaryHint();  // 최종 목적지 힌트 생성
 	void DiscoverRegion(int regionId);
-	std::pair<bool, LocationHint> TryDiscoverHintDuringTravel();  // 힌트 발견 시 좌표 반환
-	std::pair<bool, LocationHint> TryDiscoverHintFromDialogue();  // 힌트 발견 시 좌표 반환
+	std::pair<bool, LocationHint> TryDiscoverHintOnEvent();  // 이벤트 발생 시 힌트 (50% 확률, 그 중 5% 최종목적지)
+	std::pair<bool, LocationHint> TryDiscoverHintDuringTravel();  // 이동 중 힌트
+	std::pair<bool, LocationHint> TryDiscoverHintFromDialogue();  // 대화 시 힌트
 	std::vector<LocationHint> GetDiscoveredHints() const;  // 발견된 좌표 목록
+
+	// UI 알림용 힌트 접근
+	bool HasPendingHintNotification() const { return !pendingHintNotifications.empty(); }
+	const std::vector<LocationHint>& GetPendingHintNotifications() const { return pendingHintNotifications; }
+	void ClearPendingHintNotifications() { pendingHintNotifications.clear(); }
+
+	// 최종 목적지 (Sanctuary) 시스템
+	void InitializeSanctuary();  // 랜덤 좌표 생성
+	const Sanctuary& GetSanctuary() const { return sanctuary; }
+	int GetDistanceToSanctuary() const;
+	int GetAngleToSanctuary() const;
+	bool CheckSanctuaryArrival(int threshold = 30);  // 도착 체크
+	void UpgradeSanctuaryHint();  // 힌트 레벨 상승
+	bool IsSanctuaryDiscovered() const { return sanctuary.discovered; }
 
 	// 저장/로드
 	void SaveState(std::ofstream& out) const;
@@ -275,6 +316,12 @@ private:
 
 	// 발견된 힌트 목록
 	std::vector<LocationHint> discoveredHints;
+
+	// UI 알림용 대기 힌트 (획득 시 추가, UI 표시 후 제거)
+	std::vector<LocationHint> pendingHintNotifications;
+
+	// 최종 목적지
+	Sanctuary sanctuary;
 
 	// 정비 상태
 	bool inMaintenance;
