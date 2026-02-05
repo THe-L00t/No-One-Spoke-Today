@@ -85,11 +85,28 @@ namespace TerrainBalance {
 	constexpr float WASTELAND_EVENT_MOD = 1.0f;     // 기본
 
 	// === 이동 속도 밸런싱 ===
-	constexpr float BASE_SPEED = 40.0f;             // 기본 속도 (좌표/일)
-	constexpr float MAX_SPEED = 60.0f;              // 최대 속도 (최적 상태)
-	constexpr float MIN_SPEED = 15.0f;              // 최소 속도 (최악 상태)
-	constexpr float ACTIVITY_SPEED_FACTOR = 20.0f;  // 활력 보정 최대치 (±20)
-	constexpr float FATIGUE_SPEED_FACTOR = 15.0f;   // 피로 감속 최대치 (-15)
+	constexpr float BASE_SPEED = 14.0f;             // 기본 속도 (좌표/일)
+	constexpr float MAX_SPEED = 25.0f;              // 최대 속도 (최적 상태)
+	constexpr float MIN_SPEED = 5.0f;               // 최소 속도 (최악 상태)
+
+	// 노동효율 계수
+	constexpr float FATIGUE_PENALTY_MAX = 0.4f;     // 피로 최대 감소율 (1.0 → 0.6)
+	constexpr float MOTIVATION_BASE = 0.7f;         // 동기 기본값
+	constexpr float MOTIVATION_BONUS_MAX = 0.3f;    // 동기 최대 보너스
+	constexpr float STRESS_THRESHOLD = 7000.0f;     // 스트레스 급락 임계점
+	constexpr float STRESS_PENALTY_HIGH = 0.6f;     // 고스트레스 시 효율
+
+	// 협력계수
+	constexpr float TRUST_BASE = 0.8f;              // 신뢰 기본값
+	constexpr float TRUST_BONUS_MAX = 0.2f;         // 신뢰 최대 보너스
+	constexpr float HOSTILE_THRESHOLD = 0.15f;      // 적대비율 임계점 (15%)
+	constexpr float HOSTILE_PENALTY_MULT = 2.0f;    // 임계 초과 시 페널티 배율
+	constexpr float HOSTILE_PENALTY_MIN = 0.6f;     // 적대 페널티 최소값
+
+	// 인프라계수
+	constexpr float SCARCITY_THRESHOLD = 7000.0f;   // 물자부족 임계점
+	constexpr float MOOD_BASE = 0.9f;               // 분위기 기본값
+	constexpr float MOOD_BONUS_MAX = 0.1f;          // 분위기 최대 보너스
 
 	// === 힌트 발견 확률 ===
 	constexpr float HINT_CHANCE_ON_EVENT = 0.50f;   // 이벤트 발생 시 힌트 확률 (50%)
@@ -150,6 +167,30 @@ struct MapRegion {
 		: id(-1), terrain(TerrainType::Wasteland)
 		, baseTemperature(25.0f), temperatureVariation(10.0f)
 		, x(0), y(0), discovered(false), visited(false)
+	{}
+};
+
+
+// ============================================================
+// 속도 계산용 도시/시민 상태
+// ============================================================
+struct SpeedContext {
+	// 시민 평균 상태 (0~10000)
+	int avgFatigue;
+	int avgMotivation;
+	int avgStress;
+	int avgTrust;
+
+	// 적대적 시민 비율 (0.0~1.0)
+	float hostileRatio;
+
+	// 도시 지표 (0~10000)
+	int cityMood;
+	int cityScarcity;
+
+	SpeedContext()
+		: avgFatigue(5000), avgMotivation(5000), avgStress(5000), avgTrust(5000)
+		, hostileRatio(0.0f), cityMood(5000), cityScarcity(5000)
 	{}
 };
 
@@ -241,10 +282,11 @@ public:
 	int GetMovementAngle() const { return currentAngle; }
 
 	// 이동 처리 (매일 현재 각도 방향으로 이동)
-	void UpdateTravel(int cityActivity, int avgFatigue);  // 도시 상태 기반 속도
+	void UpdateTravel(const SpeedContext& ctx);  // 다층 시스템 기반 속도
 	void UpdateTravel();  // 기본 속도 (하위 호환)
 	int GetTraveledDays() const { return traveledDays; }
-	int CalculateDailySpeed(int cityActivity, int avgFatigue) const;  // 이동 속도 계산
+	int CalculateDailySpeed(const SpeedContext& ctx) const;  // 이동 속도 계산 (다층 시스템)
+	int GetLastCalculatedSpeed() const { return lastCalculatedSpeed; }  // UI 표시용
 
 	// 지역 도착 체크
 	int CheckNearbyRegion(int proximityThreshold = 30) const;  // 근처 지역 ID 반환 (-1: 없음)
@@ -313,6 +355,7 @@ private:
 	// 이동 상태
 	int currentAngle;            // 현재 설정된 이동 각도
 	int traveledDays;            // 총 이동 일수
+	int lastCalculatedSpeed{ 0 };  // 마지막 계산된 속도 (UI 표시용)
 
 	// 발견된 힌트 목록
 	std::vector<LocationHint> discoveredHints;

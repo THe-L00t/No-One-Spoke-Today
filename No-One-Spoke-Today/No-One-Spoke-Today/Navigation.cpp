@@ -323,39 +323,77 @@ void Navigation::SetMovementAngle(int angle) {
 // 이동 처리 (매일 현재 각도 방향으로 이동)
 // ============================================================
 
-// 이동 속도 계산 (도시 상태 기반)
-int Navigation::CalculateDailySpeed(int cityActivity, int avgFatigue) const {
+// ============================================================
+// 다층 이동속도 시스템 (B안)
+// 최종속도 = 기본속도 × 노동효율 × 협력계수 × 인프라 × 지형
+// ============================================================
+int Navigation::CalculateDailySpeed(const SpeedContext& ctx) const {
 	using namespace TerrainBalance;
 
-	// 기본 속도 40
-	float speed = BASE_SPEED;
+	// ========== 1. 노동효율 (Labor Efficiency) ==========
+	// 피로: 낮을수록 좋음 (0~10000) → 0.6~1.0
+	float fatigueEffect = 1.0f - (ctx.avgFatigue / 10000.0f) * FATIGUE_PENALTY_MAX;
 
-	// 활력 보정: (activity - 5000) / 5000 * 20 → -20 ~ +20
-	float activityMod = (cityActivity - 5000) / 5000.0f * ACTIVITY_SPEED_FACTOR;
-	speed += activityMod;
+	// 동기: 높을수록 좋음 (0~10000) → 0.7~1.0
+	float motivationEffect = MOTIVATION_BASE + (ctx.avgMotivation / 10000.0f) * MOTIVATION_BONUS_MAX;
 
-	// 피로 보정: -(avgFatigue / 100) * 15 → 0 ~ -15
-	float fatigueMod = -(avgFatigue / 100.0f) * FATIGUE_SPEED_FACTOR;
-	speed += fatigueMod;
+	// 스트레스: 낮을수록 좋음, 7000+ 시 급락
+	float stressEffect;
+	if (ctx.avgStress > STRESS_THRESHOLD) {
+		stressEffect = STRESS_PENALTY_HIGH;
+	}
+	else {
+		stressEffect = 1.0f - (ctx.avgStress / 20000.0f);  // 0.5~1.0
+	}
 
-	// 지형 보정
+	float laborEfficiency = fatigueEffect * motivationEffect * stressEffect;
+
+	// ========== 2. 협력계수 (Cooperation Factor) ==========
+	// 신뢰: 높을수록 좋음 (0~10000) → 0.8~1.0
+	float trustEffect = TRUST_BASE + (ctx.avgTrust / 10000.0f) * TRUST_BONUS_MAX;
+
+	// 적대적 비율: 15% 초과 시 급락
+	float hostilePenalty = 1.0f;
+	if (ctx.hostileRatio > HOSTILE_THRESHOLD) {
+		hostilePenalty = 1.0f - (ctx.hostileRatio - HOSTILE_THRESHOLD) * HOSTILE_PENALTY_MULT;
+		hostilePenalty = (std::max)(HOSTILE_PENALTY_MIN, hostilePenalty);
+	}
+
+	float cooperation = trustEffect * hostilePenalty;
+
+	// ========== 3. 인프라계수 (Infrastructure) ==========
+	// 물자부족: scarcity 7000+ 시 부품/연료 부족
+	float scarcityEffect = 1.0f;
+	if (ctx.cityScarcity > SCARCITY_THRESHOLD) {
+		scarcityEffect = 0.9f - (ctx.cityScarcity - SCARCITY_THRESHOLD) / 10000.0f;
+		scarcityEffect = (std::max)(0.7f, scarcityEffect);
+	}
+
+	// 분위기: 높을수록 좋음 → 0.9~1.0
+	float moodEffect = MOOD_BASE + (ctx.cityMood / 10000.0f) * MOOD_BONUS_MAX;
+
+	float infrastructure = scarcityEffect * moodEffect;
+
+	// ========== 4. 지형 보정 ==========
 	TerrainType terrain = GetCurrentTerrain();
 	float terrainMod = GetTerrainSpeedMod(terrain);
-	speed *= terrainMod;
+
+	// ========== 최종 계산 ==========
+	float speed = BASE_SPEED * laborEfficiency * cooperation * infrastructure * terrainMod;
 
 	// 최소/최대 제한
 	return static_cast<int>(std::clamp(speed, MIN_SPEED, MAX_SPEED));
 }
 
-// 도시 상태 기반 이동
-void Navigation::UpdateTravel(int cityActivity, int avgFatigue) {
+// 다층 시스템 기반 이동
+void Navigation::UpdateTravel(const SpeedContext& ctx) {
 	if (inMaintenance) return;
 
-	// 도시 상태 기반 속도 계산
-	int dailyDistance = CalculateDailySpeed(cityActivity, avgFatigue);
+	// 속도 계산 및 저장
+	lastCalculatedSpeed = CalculateDailySpeed(ctx);
 
 	// 현재 각도 방향으로 이동
-	MoveInDirection(currentAngle, dailyDistance);
+	MoveInDirection(currentAngle, lastCalculatedSpeed);
 
 	traveledDays++;
 }

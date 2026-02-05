@@ -121,19 +121,43 @@ void World::Update(float deltaTime)
 				navigation->UpdateMaintenance();
 			}
 			else {
-				// 도시 활력과 평균 피로 계산
-				int cityActivity = city->GetCityMet().activity;
-				int avgFatigue = 0;
+				// ========== SpeedContext 생성 (다층 이동속도 시스템) ==========
+				SpeedContext speedCtx;
+				CityMetrics cm = city->GetCityMet();
+
 				if (!humans.empty()) {
 					int fatigueSum = 0;
+					int motivationSum = 0;
+					int stressSum = 0;
+					int trustSum = 0;
+					int hostileCount = 0;
+
 					for (const auto& h : humans) {
 						fatigueSum += h->GetFatigue();
+						motivationSum += h->GetMotivation();
+						stressSum += h->GetStressLoad();
+						trustSum += h->GetInterpersonalTrust();
+
+						// 적대적 상태 카운트 (Hostile 또는 Irritable - ArousalState)
+						if (h->GetArousal() == ArousalState::Hostile ||
+							h->GetArousal() == ArousalState::Irritable) {
+							hostileCount++;
+						}
 					}
-					avgFatigue = fatigueSum / static_cast<int>(humans.size());
+
+					int count = static_cast<int>(humans.size());
+					speedCtx.avgFatigue = fatigueSum / count;
+					speedCtx.avgMotivation = motivationSum / count;
+					speedCtx.avgStress = stressSum / count;
+					speedCtx.avgTrust = trustSum / count;
+					speedCtx.hostileRatio = static_cast<float>(hostileCount) / count;
 				}
 
-				// 도시 상태 기반 이동 (활력 높고 피로 낮으면 빠름)
-				navigation->UpdateTravel(cityActivity, avgFatigue);
+				speedCtx.cityMood = cm.mood;
+				speedCtx.cityScarcity = cm.scarcity;
+
+				// 다층 시스템 기반 이동
+				navigation->UpdateTravel(speedCtx);
 
 				// 지역 근접 체크
 				int nearbyRegion = navigation->CheckNearbyRegion(30);
