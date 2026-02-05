@@ -22,8 +22,23 @@ std::string GetExeDirectory() {
     return exeDir;
 }
 
-// 상대 경로를 EXE 기준 절대 경로로 변환
+// data 폴더가 현재 작업 디렉토리에 있는지 확인 (디버그 모드 판별)
+static bool IsDebugMode() {
+    static int cached = -1;
+    if (cached < 0) {
+        DWORD attr = GetFileAttributesA("data");
+        cached = (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY)) ? 1 : 0;
+    }
+    return cached == 1;
+}
+
+// 상대 경로를 절대 경로로 변환 (디버그/릴리즈 모두 지원)
 std::string GetFullPath(const std::string& relativePath) {
+    // 디버그 모드: 현재 작업 디렉토리 사용 (Visual Studio)
+    if (IsDebugMode()) {
+        return relativePath;
+    }
+    // 릴리즈 모드: EXE 디렉토리 기준
     return GetExeDirectory() + relativePath;
 }
 
