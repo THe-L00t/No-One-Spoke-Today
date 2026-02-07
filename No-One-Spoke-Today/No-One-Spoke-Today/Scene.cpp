@@ -361,7 +361,7 @@ void GameScene::sHandleInput(char input)
 void MenuScene::Enter(std::unique_ptr<World>&)
 {
 	system("cls");
-	LoadText(menu, "menu.txt");
+	LoadText(menu, "data/menu.txt");
 
 	if (firstVisit) {
 		typewriter_print(menu, 20);
