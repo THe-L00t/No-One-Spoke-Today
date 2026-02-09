@@ -1158,6 +1158,116 @@ void EventManager::RegisterCustomEffects() {
 		}
 		city.ModifyMood(300);
 	};
+
+	// 집단 이탈 체크 - 외부 도시 조우 후 호출
+	// 도시 상태가 나쁘면 이탈 위험 증가, 일정 확률로 이탈 발생
+	customEffectRegistry["check_exodus_risk"] = [this](
+		City& city,
+		std::vector<Human*>& triggered,
+		std::vector<Human*>& affected,
+		std::vector<std::unique_ptr<Human>>& allHumans)
+	{
+		CityMetrics cm = city.GetCityMet();
+
+		// 평균 신뢰도/동기 계산
+		int trustSum = 0;
+		int motivationSum = 0;
+		for (auto& h : allHumans) {
+			trustSum += h->GetInterpersonalTrust();
+			motivationSum += h->GetMotivation();
+		}
+		int avgTrust = allHumans.empty() ? 5000 : trustSum / static_cast<int>(allHumans.size());
+		int avgMotivation = allHumans.empty() ? 5000 : motivationSum / static_cast<int>(allHumans.size());
+
+		// 이탈 위험도 계산 (0.0 ~ 1.0)
+		// mood 낮을수록, trust 낮을수록, motivation 낮을수록 위험
+		float moodRisk = (5000.0f - cm.mood) / 5000.0f;  // mood 0이면 1.0
+		float trustRisk = (5000.0f - avgTrust) / 5000.0f;
+		float motivationRisk = (5000.0f - avgMotivation) / 5000.0f;
+
+		float totalRisk = (moodRisk * 0.4f + trustRisk * 0.35f + motivationRisk * 0.25f);
+		totalRisk = std::clamp(totalRisk, 0.0f, 0.8f);  // 최대 80% 확률
+
+		// 조건: mood 25% 이하 AND (trust 35% 이하 OR motivation 30% 이하)
+		bool conditionMet = (cm.mood <= 2500) &&
+			(avgTrust <= 3500 || avgMotivation <= 3000);
+
+		if (!conditionMet) {
+			// 조건 미충족 - 약간의 동요만
+			for (auto& h : allHumans) {
+				h->ModifyStressLoad(200);
+			}
+			return;
+		}
+
+		// 확률 체크
+		std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+		if (dist(rng) > totalRisk) {
+			// 이탈 회피 - 불안만 증가
+			for (auto& h : allHumans) {
+				h->ModifyStressLoad(500);
+				h->ModifySocialSafety(-300);
+			}
+			city.ModifyMood(-300);
+			return;
+		}
+
+		// 집단 이탈 발생!
+		// 이탈자 수 계산 (위험도에 비례, 최소 30% ~ 최대 60%)
+		float exodusRatio = 0.3f + totalRisk * 0.375f;
+		int exodusCount = static_cast<int>(allHumans.size() * exodusRatio);
+
+		// 신뢰도/동기 낮은 순으로 이탈
+		std::vector<Human*> candidates;
+		for (auto& h : allHumans) {
+			candidates.push_back(h.get());
+		}
+		std::sort(candidates.begin(), candidates.end(), [](Human* a, Human* b) {
+			int scoreA = a->GetInterpersonalTrust() + a->GetMotivation();
+			int scoreB = b->GetInterpersonalTrust() + b->GetMotivation();
+			return scoreA < scoreB;  // 낮은 순
+		});
+
+		// 이탈자 표시 (실제 제거는 World에서 처리)
+		// 여기서는 affected에 이탈자 목록 저장
+		affected.clear();
+		for (int i = 0; i < exodusCount && i < static_cast<int>(candidates.size()); ++i) {
+			affected.push_back(candidates[i]);
+		}
+
+		// 남은 사람들에게 충격
+		for (auto& h : allHumans) {
+			h->ModifyStressLoad(1500);
+			h->ModifySocialSafety(-1000);
+			h->ModifyInterpersonalTrust(-800);
+		}
+		city.ModifyMood(-2000);
+		city.ModifyActivity(-1500);
+	};
+
+	// 집단 이탈 실행 - 실제로 인구 감소
+	customEffectRegistry["execute_exodus"] = [this](
+		City& city,
+		std::vector<Human*>& triggered,
+		std::vector<Human*>& affected,
+		std::vector<std::unique_ptr<Human>>& allHumans)
+	{
+		// affected에 있는 사람들 제거
+		if (affected.empty()) return;
+
+		std::set<Human*> toRemove(affected.begin(), affected.end());
+
+		allHumans.erase(
+			std::remove_if(allHumans.begin(), allHumans.end(),
+				[&toRemove](const std::unique_ptr<Human>& h) {
+					return toRemove.count(h.get()) > 0;
+				}),
+			allHumans.end()
+		);
+
+		// 인구가 일정 수준 이하면 게임오버 플래그 설정
+		// (World에서 체크)
+	};
 }
 
 

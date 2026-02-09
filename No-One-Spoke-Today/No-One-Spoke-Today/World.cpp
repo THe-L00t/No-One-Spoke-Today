@@ -165,10 +165,7 @@ void World::Update(float deltaTime)
 					navigation->OnRegionArrival(nearbyRegion);
 				}
 
-				// 최종 목적지 도착 체크
-				if (navigation->CheckSanctuaryArrival(30)) {
-					// TODO: 엔딩 트리거
-				}
+				// 최종 목적지 도착 체크는 CheckGameEndState에서 처리
 
 				// 이동 중 힌트 발견 시도
 				navigation->TryDiscoverHintDuringTravel();
@@ -470,5 +467,157 @@ void World::ResetAngleOrderCountIfNewDay()
 	if (lastAngleOrderDay != currentDay) {
 		angleOrderCountToday = 0;
 		lastAngleOrderDay = currentDay;
+	}
+}
+
+// ========== 게임 종료 상태 체크 ==========
+GameEndState World::CheckGameEndState()
+{
+	// 이미 게임이 끝났으면 현재 상태 반환
+	if (currentGameEndState != GameEndState::None) {
+		return currentGameEndState;
+	}
+
+	// 1. 승리 조건 체크 (안정지대 도착)
+	GameEndState victory = CheckVictoryCondition();
+	if (victory != GameEndState::None) {
+		currentGameEndState = victory;
+		return currentGameEndState;
+	}
+
+	// 2. 쿠데타 체크
+	if (CheckCoupCondition()) {
+		currentGameEndState = GameEndState::GameOver_Coup;
+		return currentGameEndState;
+	}
+
+	// 3. 도시 붕괴 체크 (하루 단위로 체크)
+	if (CheckCollapseCondition()) {
+		currentGameEndState = GameEndState::GameOver_Collapse;
+		return currentGameEndState;
+	}
+
+	// 4. 자원 고갈 체크 (하루 단위로 체크)
+	if (CheckStarvationCondition()) {
+		currentGameEndState = GameEndState::GameOver_Starvation;
+		return currentGameEndState;
+	}
+
+	// 5. 집단 이탈 체크 (인구 100명 이하 = 초기 200명의 50%)
+	if (CheckExodusCondition()) {
+		currentGameEndState = GameEndState::GameOver_Exodus;
+		return currentGameEndState;
+	}
+
+	return GameEndState::None;
+}
+
+bool World::CheckCoupCondition() const
+{
+	if (humans.empty()) return false;
+
+	// 평균 신뢰도 계산
+	int trustSum = 0;
+	int hostileCount = 0;
+
+	for (const auto& h : humans) {
+		trustSum += h->GetInterpersonalTrust();
+		if (h->GetArousal() == ArousalState::Hostile) {
+			hostileCount++;
+		}
+	}
+
+	int avgTrust = trustSum / static_cast<int>(humans.size());
+	float hostileRatio = static_cast<float>(hostileCount) / humans.size();
+
+	// 조건: 평균 신뢰도 15% 이하 (1500/10000) + 적대적 인물 15% 이상
+	return (avgTrust <= 1500 && hostileRatio >= 0.15f);
+}
+
+bool World::CheckCollapseCondition()
+{
+	if (!city) return false;
+
+	// 하루에 한 번만 체크
+	if (lastCriticalCheckDay == currentDay) {
+		return false;
+	}
+
+	CityMetrics cm = city->GetCityMet();
+
+	// mood가 10% 이하 (1000/10000)인지 체크
+	if (cm.mood <= 1000) {
+		// 연속 일수 체크 (하루 단위)
+		if (lastCriticalCheckDay == currentDay - 1) {
+			criticalDaysCount++;
+		}
+		else {
+			criticalDaysCount = 1;
+		}
+	}
+	else {
+		criticalDaysCount = 0;
+	}
+
+	lastCriticalCheckDay = currentDay;
+
+	// 7일 연속이면 게임오버
+	return (criticalDaysCount >= 7);
+}
+
+bool World::CheckStarvationCondition()
+{
+	if (!city) return false;
+
+	CityMetrics cm = city->GetCityMet();
+
+	// scarcity가 90% 이상 (9000/10000)인지 체크
+	if (cm.scarcity >= 9000) {
+		// 연속 일수 체크
+		if (lastCriticalCheckDay == currentDay - 1 || lastCriticalCheckDay == currentDay) {
+			starvationDaysCount++;
+		}
+		else {
+			starvationDaysCount = 1;
+		}
+	}
+	else {
+		starvationDaysCount = 0;
+	}
+
+	// 7일 연속이면 게임오버
+	return (starvationDaysCount >= 7);
+}
+
+bool World::CheckExodusCondition() const
+{
+	// 인구가 초기 인원(200명)의 50% 이하로 떨어지면 게임오버
+	// 도시 운영 불가능 상태
+	return (humans.size() <= 100);
+}
+
+GameEndState World::CheckVictoryCondition()
+{
+	if (!navigation) return GameEndState::None;
+
+	// 안정지대 도착 체크
+	if (!navigation->CheckSanctuaryArrival(30)) {
+		return GameEndState::None;
+	}
+
+	// 도시 상태에 따라 결말 분기
+	if (!city) return GameEndState::Victory_Normal;
+
+	CityMetrics cm = city->GetCityMet();
+
+	// mood 기준: 70% 이상 = Good, 40% 이상 = Normal, 그 외 = Bad
+	if (cm.mood >= 7000) {
+		return GameEndState::Victory_Good;
+	}
+	else if (cm.mood >= 4000) {
+		return GameEndState::Victory_Normal;
+	}
+	else {
+		return GameEndState::Victory_Bad;
 	}
 }

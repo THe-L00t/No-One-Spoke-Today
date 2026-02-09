@@ -18,7 +18,8 @@ void Framework::Init()
     scenes["play"] = std::make_unique<GameScene>();
     scenes["menu"] = std::make_unique<MenuScene>();
     scenes["save"] = std::make_unique<SaveScene>();
-
+    scenes["ending"] = std::make_unique<EndingScene>();
+    scenes["gameover"] = std::make_unique<GameOverScene>();
 }
 
 void Framework::Loop()
@@ -46,8 +47,28 @@ void Framework::Loop()
         if (currentScene->IsSceneChangeRequested()) {
             std::string nextSceneName = currentScene->GetNextSceneName();
             currentScene->Exit();
+
+            // 엔딩/게임오버 씬일 경우 타입 설정
+            if (nextSceneName == "ending" && world) {
+                EndingScene* endingScene = dynamic_cast<EndingScene*>(scenes["ending"].get());
+                if (endingScene) {
+                    endingScene->SetEndingType(world->GetCurrentGameEndState());
+                }
+            }
+            else if (nextSceneName == "gameover" && world) {
+                GameOverScene* gameOverScene = dynamic_cast<GameOverScene*>(scenes["gameover"].get());
+                if (gameOverScene) {
+                    gameOverScene->SetGameOverType(world->GetCurrentGameEndState());
+                }
+            }
+
             currentScene = scenes[nextSceneName].get();
             currentScene->Enter(world);
+
+            // 타이틀로 돌아갈 때 월드 리셋
+            if (nextSceneName == "start") {
+                world.reset();
+            }
         }
 
         // CPU 과부하 방지를 위한 짧은 sleep

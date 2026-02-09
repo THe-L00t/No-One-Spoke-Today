@@ -1589,20 +1589,68 @@ choice_1_text     = 우호적으로 통신에 응한다
 choice_1_effect   = ModifyDrive, InterpersonalTrust, 300, AllHumans
 choice_1_effect   = ModifyDrive, Motivation, 400, AllHumans
 choice_1_effect   = ModifyCityMetric, Mood, 300, City
+choice_1_effect   = Custom, 0, 0, AllHumans, check_exodus_risk
 
 choice_2_text     = 경계 태세를 유지하며 대화한다
 choice_2_effect   = ModifyDrive, StressLoad, 300, AllHumans
 choice_2_effect   = ModifyDrive, SocialSafety, 200, AllHumans
+choice_2_effect   = Custom, 0, 0, AllHumans, check_exodus_risk
 
 choice_3_text     = 물자 교환을 제안한다
 choice_3_effect   = ModifyCityMetric, Scarcity, -300, City
 choice_3_effect   = ModifyDrive, InterpersonalTrust, 200, AllHumans
 choice_3_effect   = ModifyDrive, Motivation, 300, AllHumans
+choice_3_effect   = Custom, 0, 0, AllHumans, check_exodus_risk
 
 choice_4_text     = 거리를 두고 관찰만 한다
 choice_4_effect   = ModifyDrive, StressLoad, 200, AllHumans
 choice_4_effect   = ModifyDrive, SocialSafety, 300, AllHumans
 choice_4_effect   = ModifyDrive, Motivation, -200, AllHumans
+choice_4_effect   = Custom, 0, 0, AllHumans, check_exodus_risk
+[EVENT_END]
+
+################################################################################
+# 집단 이탈 위기 - 상태가 극도로 나쁠 때 독립적으로 발생
+################################################################################
+
+[EVENT_START]
+id                = soc_exodus_crisis_001
+name              = 집단 이탈 위기
+category          = Social
+description       = 식당에서 수군거리는 소리가 들립니다. "저 도시로 가면 더 나을까?" 누군가의 말에 여러 사람이 고개를 끄덕입니다.
+
+trigger_type      = condition
+city_mask         = 0x0038
+city_min          = 0x0000
+city_max          = 0x0010
+human_mask        = 0x0
+min_human_count   = 0
+
+cooldown_min      = 10
+cooldown_max      = 20
+
+effect_scope      = AllHumans
+requires_player   = true
+
+choice_1_text     = 직접 나서서 사람들을 설득한다
+choice_1_effect   = ModifyDrive, InterpersonalTrust, 500, AllHumans
+choice_1_effect   = ModifyDrive, Motivation, 400, AllHumans
+choice_1_effect   = ModifyCityMetric, Mood, 400, City
+
+choice_2_text     = 상황을 지켜보며 불만의 원인을 파악한다
+choice_2_effect   = ModifyDrive, StressLoad, 300, AllHumans
+choice_2_effect   = ModifyDrive, SenseOfControl, 200, AllHumans
+
+choice_3_text     = 물자 배급을 늘려 불만을 잠재운다
+choice_3_effect   = ModifyCityMetric, Scarcity, 500, City
+choice_3_effect   = ModifyDrive, Motivation, 600, AllHumans
+choice_3_effect   = ModifyCityMetric, Mood, 300, City
+
+choice_4_text     = 강경하게 질서를 유지한다
+choice_4_effect   = ModifyDrive, StressLoad, 800, AllHumans
+choice_4_effect   = ModifyDrive, InterpersonalTrust, -600, AllHumans
+choice_4_effect   = ModifyDrive, SocialSafety, -400, AllHumans
+choice_4_effect   = ModifyCityMetric, Activity, 300, City
 [EVENT_END]
 
 [EVENT_START]

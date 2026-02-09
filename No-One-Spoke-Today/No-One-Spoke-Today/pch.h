@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <cassert>
 #include <print>
+#include <format>
 #include <conio.h>
 #include <deque>
 #include <set>

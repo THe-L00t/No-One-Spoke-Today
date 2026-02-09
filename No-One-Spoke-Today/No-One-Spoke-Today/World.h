@@ -5,6 +5,17 @@
 #include "Event.h"
 #include "Navigation.h"
 
+// 게임 종료 상태
+enum class GameEndState {
+	None,				// 게임 진행 중
+	Victory_Good,		// 안정지대 도착 - 좋은 결말
+	Victory_Normal,		// 안정지대 도착 - 보통 결말
+	Victory_Bad,		// 안정지대 도착 - 나쁜 결말
+	GameOver_Coup,		// 쿠데타
+	GameOver_Collapse,	// 도시 붕괴
+	GameOver_Exodus,	// 집단 이탈
+	GameOver_Starvation	// 자원 고갈
+};
 
 class World
 {
@@ -80,5 +91,26 @@ public:
 	void SetLastAngleOrderDay(int day) { lastAngleOrderDay = day; }
 	void IncrementAngleOrderCount();
 	void ResetAngleOrderCountIfNewDay();
+
+	// 게임 종료 상태 체크
+	GameEndState CheckGameEndState();
+	GameEndState GetCurrentGameEndState() const { return currentGameEndState; }
+	bool IsGameEnded() const { return currentGameEndState != GameEndState::None; }
+	int GetCriticalDaysCount() const { return criticalDaysCount; }
+	int GetStarvationDaysCount() const { return starvationDaysCount; }
+
+private:
+	// 게임 종료 상태 추적
+	GameEndState currentGameEndState{ GameEndState::None };
+	int criticalDaysCount{ 0 };		// 회생불가 상태 연속 일수
+	int starvationDaysCount{ 0 };	// 자원 고갈 상태 연속 일수
+	int lastCriticalCheckDay{ -1 };	// 마지막 체크한 날
+
+	// 내부 체크 함수들
+	bool CheckCoupCondition() const;
+	bool CheckCollapseCondition();
+	bool CheckStarvationCondition();
+	bool CheckExodusCondition() const;
+	GameEndState CheckVictoryCondition();
 };
 

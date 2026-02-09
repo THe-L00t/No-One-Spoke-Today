@@ -196,3 +196,51 @@ private:
 	bool saveAble{ false };
 	int option{};
 };
+
+// 엔딩 씬 (안정지대 도착)
+class EndingScene : public Scene
+{
+public:
+	void Enter(std::unique_ptr<World>&);
+	void Update(float);
+	void Display();
+	void Exit();
+	void HandleInput(char);
+	void sHandleInput(char);
+
+	void SetEndingType(GameEndState type) { endingType = type; }
+
+private:
+	void LoadEndingText();
+	std::string FormatEndingText(const std::string& text);
+
+	World* world{ nullptr };
+	GameEndState endingType{ GameEndState::Victory_Normal };
+	std::string endingText;
+	bool textLoaded{ false };
+	bool displayComplete{ false };
+};
+
+// 게임오버 씬
+class GameOverScene : public Scene
+{
+public:
+	void Enter(std::unique_ptr<World>&);
+	void Update(float);
+	void Display();
+	void Exit();
+	void HandleInput(char);
+	void sHandleInput(char);
+
+	void SetGameOverType(GameEndState type) { gameOverType = type; }
+
+private:
+	void LoadGameOverText();
+	std::string FormatGameOverText(const std::string& text);
+
+	World* world{ nullptr };
+	GameEndState gameOverType{ GameEndState::GameOver_Collapse };
+	std::string gameOverText;
+	bool textLoaded{ false };
+	bool displayComplete{ false };
+};

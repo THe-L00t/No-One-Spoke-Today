@@ -124,6 +124,22 @@ void GameScene::Update(float deltaTime)
 	// 이벤트 선택 대기 중이면 시뮬레이션 일시정지
 	if (!waitingForChoice) {
 		world->Update(deltaTime);
+
+		// 게임 종료 상태 체크
+		GameEndState endState = world->CheckGameEndState();
+		if (endState != GameEndState::None) {
+			// 승리 조건
+			if (endState == GameEndState::Victory_Good ||
+				endState == GameEndState::Victory_Normal ||
+				endState == GameEndState::Victory_Bad) {
+				RequestSceneChange("ending");
+			}
+			// 게임오버 조건
+			else {
+				RequestSceneChange("gameover");
+			}
+			return;
+		}
 	}
 
 	int today = world->GetCurrentDay();
@@ -2350,4 +2366,256 @@ void GameScene::CheckAndDisplayHints() {
 
 	// 힌트 알림 클리어
 	nav->ClearPendingHintNotifications();
+}
+
+// ==================== EndingScene ====================
+
+void EndingScene::Enter(std::unique_ptr<World>& w)
+{
+	system("cls");
+	world = w.get();
+	textLoaded = false;
+	displayComplete = false;
+	LoadEndingText();
+}
+
+void EndingScene::Update(float deltaTime)
+{
+	// 특별한 업데이트 없음
+}
+
+void EndingScene::Display()
+{
+	if (!displayComplete) {
+		gotoxy(0, 0);
+		std::cout << endingText << std::endl;
+		std::cout << "\n\n    [아무 키나 누르면 타이틀로 돌아갑니다]" << std::endl;
+		displayComplete = true;
+	}
+}
+
+void EndingScene::Exit()
+{
+	sceneChangeRequested = false;
+	oldScene = "ending";
+}
+
+void EndingScene::HandleInput(char input)
+{
+	// 아무 키나 누르면 타이틀로
+	RequestSceneChange("start");
+}
+
+void EndingScene::sHandleInput(char input)
+{
+	// 방향키도 타이틀로
+	RequestSceneChange("start");
+}
+
+void EndingScene::LoadEndingText()
+{
+	if (textLoaded) return;
+
+	std::string filepath = "data/ending_sanctuary.txt";
+	std::ifstream file(GetFullPath(filepath));
+
+	if (!file.is_open()) {
+		endingText = "[엔딩 텍스트를 불러올 수 없습니다]";
+		textLoaded = true;
+		return;
+	}
+
+	// 엔딩 타입에 따른 섹션 선택
+	std::string sectionStart, sectionEnd;
+	switch (endingType) {
+	case GameEndState::Victory_Good:
+		sectionStart = "[ENDING_GOOD]";
+		sectionEnd = "[ENDING_GOOD_END]";
+		break;
+	case GameEndState::Victory_Normal:
+		sectionStart = "[ENDING_NORMAL]";
+		sectionEnd = "[ENDING_NORMAL_END]";
+		break;
+	case GameEndState::Victory_Bad:
+	default:
+		sectionStart = "[ENDING_BAD]";
+		sectionEnd = "[ENDING_BAD_END]";
+		break;
+	}
+
+	std::string line;
+	bool inSection = false;
+	std::ostringstream content;
+
+	while (std::getline(file, line)) {
+		if (line.find(sectionStart) != std::string::npos) {
+			inSection = true;
+			continue;
+		}
+		if (line.find(sectionEnd) != std::string::npos) {
+			break;
+		}
+		if (inSection) {
+			content << line << "\n";
+		}
+	}
+
+	endingText = FormatEndingText(content.str());
+	textLoaded = true;
+
+	// 타자기 효과로 출력
+	typewriter_print(endingText, 30);
+}
+
+std::string EndingScene::FormatEndingText(const std::string& text)
+{
+	std::string result = text;
+
+	// %DATE% 치환
+	if (world) {
+		std::string date = std::format("2156-{:02d}-{:02d}", world->GetMonth(), world->GetDay());
+		size_t pos;
+		while ((pos = result.find("%DATE%")) != std::string::npos) {
+			result.replace(pos, 6, date);
+		}
+
+		// %POP% 치환
+		std::string pop = std::to_string(world->GetHumansSize());
+		while ((pos = result.find("%POP%")) != std::string::npos) {
+			result.replace(pos, 5, pop);
+		}
+
+		// %DAYS% 치환
+		std::string days = std::to_string(world->GetCurrentDay());
+		while ((pos = result.find("%DAYS%")) != std::string::npos) {
+			result.replace(pos, 6, days);
+		}
+	}
+
+	return result;
+}
+
+// ==================== GameOverScene ====================
+
+void GameOverScene::Enter(std::unique_ptr<World>& w)
+{
+	system("cls");
+	world = w.get();
+	textLoaded = false;
+	displayComplete = false;
+	LoadGameOverText();
+}
+
+void GameOverScene::Update(float deltaTime)
+{
+	// 특별한 업데이트 없음
+}
+
+void GameOverScene::Display()
+{
+	if (!displayComplete) {
+		gotoxy(0, 0);
+		std::cout << gameOverText << std::endl;
+		std::cout << "\n\n    [아무 키나 누르면 타이틀로 돌아갑니다]" << std::endl;
+		displayComplete = true;
+	}
+}
+
+void GameOverScene::Exit()
+{
+	sceneChangeRequested = false;
+	oldScene = "gameover";
+}
+
+void GameOverScene::HandleInput(char input)
+{
+	// 아무 키나 누르면 타이틀로
+	RequestSceneChange("start");
+}
+
+void GameOverScene::sHandleInput(char input)
+{
+	// 방향키도 타이틀로
+	RequestSceneChange("start");
+}
+
+void GameOverScene::LoadGameOverText()
+{
+	if (textLoaded) return;
+
+	std::string filepath;
+	switch (gameOverType) {
+	case GameEndState::GameOver_Coup:
+		filepath = "data/gameover_coup.txt";
+		break;
+	case GameEndState::GameOver_Collapse:
+		filepath = "data/gameover_collapse.txt";
+		break;
+	case GameEndState::GameOver_Exodus:
+		filepath = "data/gameover_exodus.txt";
+		break;
+	case GameEndState::GameOver_Starvation:
+		filepath = "data/gameover_starvation.txt";
+		break;
+	default:
+		filepath = "data/gameover_collapse.txt";
+		break;
+	}
+
+	std::ifstream file(GetFullPath(filepath));
+
+	if (!file.is_open()) {
+		gameOverText = "[게임오버 텍스트를 불러올 수 없습니다]";
+		textLoaded = true;
+		return;
+	}
+
+	std::ostringstream content;
+	std::string line;
+
+	while (std::getline(file, line)) {
+		// 주석 라인 스킵
+		if (line.empty() || line[0] == '#') continue;
+		content << line << "\n";
+	}
+
+	gameOverText = FormatGameOverText(content.str());
+	textLoaded = true;
+
+	// 타자기 효과로 출력
+	typewriter_print(gameOverText, 30);
+}
+
+std::string GameOverScene::FormatGameOverText(const std::string& text)
+{
+	std::string result = text;
+
+	// %DATE% 치환
+	if (world) {
+		std::string date = std::format("2156-{:02d}-{:02d}", world->GetMonth(), world->GetDay());
+		size_t pos;
+		while ((pos = result.find("%DATE%")) != std::string::npos) {
+			result.replace(pos, 6, date);
+		}
+
+		// %COLLAPSE_DAYS% 치환 (회생불가 일수)
+		std::string collapseDays = std::to_string(world->GetCriticalDaysCount());
+		while ((pos = result.find("%COLLAPSE_DAYS%")) != std::string::npos) {
+			result.replace(pos, 15, collapseDays);
+		}
+
+		// %STARVE_DAYS% 치환 (기아 일수)
+		std::string starveDays = std::to_string(world->GetStarvationDaysCount());
+		while ((pos = result.find("%STARVE_DAYS%")) != std::string::npos) {
+			result.replace(pos, 13, starveDays);
+		}
+
+		// %REMAIN% 치환 (남은 인원)
+		std::string remain = std::to_string(world->GetHumansSize() / 2);  // 절반 이탈 가정
+		while ((pos = result.find("%REMAIN%")) != std::string::npos) {
+			result.replace(pos, 8, remain);
+		}
+	}
+
+	return result;
 }
