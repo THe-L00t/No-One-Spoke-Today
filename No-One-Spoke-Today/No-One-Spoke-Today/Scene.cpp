@@ -7,7 +7,7 @@ std::string Scene::oldScene;
 
 void TitleScene::Enter(std::unique_ptr<World>&)
 {
-	LoadText(title, "data/title.txt");
+	LoadText(title, "data/title.txt");  
 	LoadText(intro, "data/intro.txt");
 	system("cls");
 
