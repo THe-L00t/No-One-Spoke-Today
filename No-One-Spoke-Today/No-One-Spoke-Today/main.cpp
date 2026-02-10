@@ -2,6 +2,26 @@
 #include "Toolkit.h"
 #include <print>
 
+// 번들 폰트 등록 및 콘솔 폰트 설정
+bool InstallBundledFont(const std::wstring& fontPath, const wchar_t* fontName) {
+	// 폰트 파일을 세션에 임시 등록 (프로세스 종료 시 자동 해제)
+	int result = AddFontResourceExW(fontPath.c_str(), FR_PRIVATE, 0);
+	if (result == 0) return false;
+
+	// 콘솔 폰트 설정
+	HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+	CONSOLE_FONT_INFOEX cfi = {};
+	cfi.cbSize = sizeof(cfi);
+	cfi.nFont = 0;
+	cfi.dwFontSize.X = 0;
+	cfi.dwFontSize.Y = 18;
+	cfi.FontFamily = FF_DONTCARE;
+	cfi.FontWeight = FW_NORMAL;
+	wcscpy_s(cfi.FaceName, fontName);
+
+	return SetCurrentConsoleFontEx(hOut, FALSE, &cfi) != 0;
+}
+
 // 콘솔 초기화 함수
 void InitConsole() {
 	// 콘솔 제목 설정
@@ -40,15 +60,22 @@ void InitConsole() {
 		SetConsoleMode(hOut, dwMode);
 	}
 
-	// 콘솔 폰트 확인 안내 (유니코드 박스 문자 지원 폰트 필요)
-	CONSOLE_FONT_INFOEX cfi;
-	cfi.cbSize = sizeof(cfi);
-	if (GetCurrentConsoleFontEx(hOut, FALSE, &cfi)) {
-		// 폰트가 래스터 폰트면 경고
-		if (wcscmp(cfi.FaceName, L"Terminal") == 0 ||
-			wcscmp(cfi.FaceName, L"") == 0) {
-			std::cout << "[!] 콘솔 폰트를 'Consolas' 또는 'NSimSun'으로 변경하세요.\n";
-			std::cout << "    (콘솔 제목 우클릭 > 속성 > 글꼴)\n\n";
+	// 번들 폰트 로드 (data/fonts/D2Coding.ttf)
+	std::string fontPathA = GetFullPath("data\\fonts\\D2Coding.ttf");
+	std::wstring fontPathW(fontPathA.begin(), fontPathA.end());
+
+	if (!InstallBundledFont(fontPathW, L"D2Coding")) {
+		// 번들 폰트 실패 시 시스템 폰트로 폴백
+		CONSOLE_FONT_INFOEX cfi = {};
+		cfi.cbSize = sizeof(cfi);
+		cfi.dwFontSize.Y = 18;
+		cfi.FontFamily = FF_DONTCARE;
+		cfi.FontWeight = FW_NORMAL;
+		wcscpy_s(cfi.FaceName, L"NSimSun");
+		if (!SetCurrentConsoleFontEx(hOut, FALSE, &cfi)) {
+			// NSimSun도 없으면 Consolas로 최종 폴백
+			wcscpy_s(cfi.FaceName, L"Consolas");
+			SetCurrentConsoleFontEx(hOut, FALSE, &cfi);
 		}
 	}
 }

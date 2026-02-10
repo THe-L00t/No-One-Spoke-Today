@@ -993,8 +993,13 @@ void GameScene::DisplayDayStart()
 	std::println("  ║  {:44}  ║", currentGreeting);
 	std::println("  ║  {:44}  ║", currentWheel);
 	std::println("  ╠════════════════════════════════════════════════╣");
-	std::println("  ║  [진행률] ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   0%  ║");
-	std::println("  ║            0분 /  8분                          ║");
+	float accTime = world->GetAccumulatedTime();
+	float ratio = accTime / 480.0f;
+	std::string progressBar = GetProgressBar(ratio, 30);
+	int minutes = static_cast<int>(accTime / 60.0f);
+	int totalMinutes = 8;
+	std::println("  ║  [진행률] {} {:>3}%  ║", progressBar, static_cast<int>(ratio * 100));
+	std::println("  ║           {:>2}분 / {:>2}분                          ║", minutes, totalMinutes);
 	std::println("  ╚════════════════════════════════════════════════╝");
 
 	// 기본 키 + 구역별 특수 키

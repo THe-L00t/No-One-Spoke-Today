@@ -8,7 +8,9 @@
       "Bash(move title.txt data )",
       "Bash(move titleASCIIart.txt data )",
       "Bash(move menu.txt data)",
-      "Bash(git -C \"C:\\\\Users\\\\sigun\\\\University\\\\방학스터디\\\\No-One-Spoke-Today\\\\No-One-Spoke-Today\\\\No-One-Spoke-Today\" status --short)"
+      "Bash(git -C \"C:\\\\Users\\\\sigun\\\\University\\\\방학스터디\\\\No-One-Spoke-Today\\\\No-One-Spoke-Today\\\\No-One-Spoke-Today\" status --short)",
+      "Bash(curl:*)",
+      "Bash(unzip:*)"
     ]
   }
 }

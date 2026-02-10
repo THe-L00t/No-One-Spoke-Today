@@ -3,7 +3,7 @@
 std::random_device rd;
 std::default_random_engine dre(rd());
 std::uniform_int_distribution rtrait{ 0,100 };
-std::uniform_int_distribution rdrive{ 40,60 };
+std::uniform_int_distribution rdrive{ 4000,6000 };
 
 Human::Human()
 {
@@ -49,10 +49,10 @@ Human::Human()
 void Human::UpdateMentalState()
 {
     // ---------- ArousalState ----------
-        // 상태별 임계값 계산 (정교한 수식 유지)
-    double tenseThreshold = 40.0 - traits.emotionalSensitivity * 0.25 + traits.rationality * 0.15;
-    double irritableThreshold = 60.0 - traits.emotionalSensitivity * 0.35 + traits.aggressiveness * 0.25;
-    double hostileThreshold = 75.0 - traits.emotionalSensitivity * 0.45 + traits.aggressiveness * 0.35;
+    // 상태별 임계값 계산 (drives 0~10000 스케일)
+    double tenseThreshold = 4000.0 - traits.emotionalSensitivity * 25.0 + traits.rationality * 15.0;
+    double irritableThreshold = 6000.0 - traits.emotionalSensitivity * 35.0 + traits.aggressiveness * 25.0;
+    double hostileThreshold = 7500.0 - traits.emotionalSensitivity * 45.0 + traits.aggressiveness * 35.0;
 
     if (drives.stressLoad <= tenseThreshold && drives.emotionalArousal <= tenseThreshold) {
         state.arousal = ArousalState::Calm;
@@ -68,35 +68,37 @@ void Human::UpdateMentalState()
     }
 
     // ---------- EnergyState ----------
-    // 피로 누적 + 인지 능력, 감정 각성 고려
+    // 피로 누적 + 인지 능력, 감정 각성 고려 (0~10000 스케일)
     double fatigueScore = drives.fatigue + drives.emotionalArousal * 0.2 - drives.cognitiveCapacity * 0.1;
-    if (fatigueScore < 50.0)
+    if (fatigueScore < 5000.0)
         state.energy = EnergyState::Normal;
-    else if (fatigueScore < 75.0)
+    else if (fatigueScore < 7500.0)
         state.energy = EnergyState::Fatigued;
     else
         state.energy = EnergyState::Exhausted;
 
     // ---------- SocialState ----------
-    // 신뢰, 통제감, 감정 각성, 의존성 반영
-    double coopScore = drives.interpersonalTrust + drives.motivation * 0.5 - drives.senseOfControl * 0.3 + traits.dependency * 0.2;
-    double withdrawScore = 100 - drives.interpersonalTrust + drives.fatigue * 0.5 + traits.rigidity * 0.3;
+    // 신뢰, 통제감, 감정 각성, 의존성 반영 (traits 계수 ×100 보정)
+    double coopScore = drives.interpersonalTrust + drives.motivation * 0.5
+                     - drives.senseOfControl * 0.3 + traits.dependency * 20.0;
+    double withdrawScore = 10000.0 - drives.interpersonalTrust
+                         + drives.fatigue * 0.5 + traits.rigidity * 30.0;
 
-    if (coopScore > 65.0)
+    if (coopScore > 6500.0)
         state.social = SocialState::Cooperative;
-    else if (withdrawScore > 60.0)
+    else if (withdrawScore > 6000.0)
         state.social = SocialState::Withdrawn;
     else
         state.social = SocialState::Neutral;
 
     // ---------- ControlState ----------
-    // 통제감, 의존성, 고집, 스트레스 고려
-    double dependentScore = traits.dependency * 0.6 + (50 - drives.senseOfControl) * 0.4;
-    double stubbornScore = traits.rigidity * 0.7 + drives.stressLoad * 0.3;
+    // 통제감, 의존성, 고집, 스트레스 고려 (traits 계수 ×100, drives 계수 ÷100 보정)
+    double dependentScore = traits.dependency * 60.0 + (5000.0 - drives.senseOfControl) * 0.4;
+    double stubbornScore = traits.rigidity * 70.0 + drives.stressLoad * 0.3;
 
-    if (dependentScore > 60.0)
+    if (dependentScore > 6000.0)
         state.control = ControlState::Dependent;
-    else if (stubbornScore > 65.0)
+    else if (stubbornScore > 6500.0)
         state.control = ControlState::Stubborn;
     else
         state.control = ControlState::Autonomous;
