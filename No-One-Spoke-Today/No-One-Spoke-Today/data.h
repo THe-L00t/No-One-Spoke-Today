@@ -295,15 +295,15 @@ struct UpdateContext {
 // 수식 관련 상수
 // =============================================================================================
 namespace FormulaConstants {
-	// 기본 변화량 (초당)
-	constexpr float BASE_STRESS_CHANGE = 0.15f;
-	constexpr float BASE_FATIGUE_CHANGE = 0.08f;
-	constexpr float BASE_MOTIVATION_CHANGE = 0.10f;
-	constexpr float BASE_SAFETY_CHANGE = 0.06f;
-	constexpr float BASE_TRUST_CHANGE = 0.04f;
-	constexpr float BASE_CONTROL_CHANGE = 0.05f;
-	constexpr float BASE_AROUSAL_CHANGE = 0.12f;
-	constexpr float BASE_COGNITION_CHANGE = 0.05f;
+	// 기본 변화량 (초당) - 20% 감소 적용
+	constexpr float BASE_STRESS_CHANGE = 0.12f;      // 기존 0.15
+	constexpr float BASE_FATIGUE_CHANGE = 0.064f;    // 기존 0.08
+	constexpr float BASE_MOTIVATION_CHANGE = 0.08f;  // 기존 0.10
+	constexpr float BASE_SAFETY_CHANGE = 0.048f;     // 기존 0.06
+	constexpr float BASE_TRUST_CHANGE = 0.032f;      // 기존 0.04
+	constexpr float BASE_CONTROL_CHANGE = 0.04f;     // 기존 0.05
+	constexpr float BASE_AROUSAL_CHANGE = 0.096f;    // 기존 0.12
+	constexpr float BASE_COGNITION_CHANGE = 0.04f;   // 기존 0.05
 
 	// 사회적 전염 계수
 	constexpr float CONTAGION_HOSTILE = 0.15f;      // 적대적 사람 한 명당 전염

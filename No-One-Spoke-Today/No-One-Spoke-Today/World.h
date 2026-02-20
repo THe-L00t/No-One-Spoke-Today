@@ -69,6 +69,7 @@ private:
 
 	float accumulatedTime{};
 	static constexpr float dayDuration = 480.0f; // 8분 = 480초
+	static constexpr int GAMEOVER_IMMUNITY_DAYS = 7;  // 첫 7일간 게임오버 면역
 
 	std::unique_ptr<City> city;
 	std::vector<std::unique_ptr<Human>> humans;

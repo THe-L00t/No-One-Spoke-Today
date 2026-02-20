@@ -485,6 +485,11 @@ GameEndState World::CheckGameEndState()
 		return currentGameEndState;
 	}
 
+	// 면역 기간 체크: 첫 7일간은 게임오버 조건 체크 안 함
+	if (currentDay <= GAMEOVER_IMMUNITY_DAYS) {
+		return GameEndState::None;
+	}
+
 	// 2. 쿠데타 체크
 	if (CheckCoupCondition()) {
 		currentGameEndState = GameEndState::GameOver_Coup;
