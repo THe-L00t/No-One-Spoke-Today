@@ -3,7 +3,7 @@
 ; Non-commercial use only
 
 #define MyAppName "No One Spoke Today"
-#define MyAppVersion "1.0.1"
+#define MyAppVersion "1.0.2"
 #define MyAppPublisher "THe-L00t"
 #define MyAppExeName "No-One-Spoke-Today.exe"
 
