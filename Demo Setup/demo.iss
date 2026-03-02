@@ -3,7 +3,7 @@
 ; Non-commercial use only
 
 #define MyAppName "No One Spoke Today"
-#define MyAppVersion "1.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "THe-L00t"
 #define MyAppExeName "No-One-Spoke-Today.exe"
 
@@ -43,8 +43,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "C:\Users\sigun\University\방학스터디\No-One-Spoke-Today\No-One-Spoke-Today\x64\Release\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "C:\Users\sigun\University\방학스터디\No-One-Spoke-Today\No-One-Spoke-Today\x64\Release\data\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "C:\Users\sigun\University\방학스터디\No-One-Spoke-Today\No-One-Spoke-Today\x64\Release\data\dialogues\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "C:\Users\sigun\University\방학스터디\No-One-Spoke-Today\No-One-Spoke-Today\No-One-Spoke-Today\data\*"; DestDir: "{app}\data"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Source: "C:\Users\sigun\University\방학스터디\No-One-Spoke-Today\No-One-Spoke-Today\No-One-Spoke-Today\data\dialogues\*"; DestDir: "{app}\data"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]
